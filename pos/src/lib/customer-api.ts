@@ -90,3 +90,27 @@ export async function searchCustomers(search: string, limit = 5) {
     throw error;
   }
 }
+
+export async function getCustomerByName(customerName: string): Promise<Customer | null> {
+  try {
+    if (!customerName) return null;
+    const customer = await db.getDoc(DOCTYPES.CUSTOMER, customerName);
+    return customer as Customer;
+  } catch (error) {
+    console.error(`Error fetching customer ${customerName}:`, error);
+    return null;
+  }
+}
+
+export async function getDefaultCustomerFromProfile(profile: any): Promise<Customer | null> {
+  try {
+    if (!profile?.customer) return null;
+
+    // Fetch full customer document
+    const customer = await getCustomerByName(profile.customer);
+    return customer;
+  } catch (error) {
+    console.error("Error fetching default customer:", error);
+    return null;
+  }
+}
