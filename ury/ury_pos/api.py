@@ -206,14 +206,15 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
-            AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
-            ORDER BY modified desc
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
+                pi.posting_date, pi.rounded_total, pi.order_type 
+            FROM `tabPOS Invoice` pi
+            LEFT JOIN `tabUser` u ON pi.cashier = u.email
+            WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
+            AND (pi.invoice_printed = 1 OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = ''))
+            ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, status, cashier, limit, limit_start),
@@ -226,14 +227,15 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
-            AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
-            ORDER BY modified desc
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
+                pi.posting_date, pi.rounded_total, pi.order_type 
+            FROM `tabPOS Invoice` pi
+            LEFT JOIN `tabUser` u ON pi.cashier = u.email
+            WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
+            AND (pi.invoice_printed = 0 AND pi.restaurant_table IS NOT NULL)
+            ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, docstatus, cashier, limit, limit_start),
@@ -245,13 +247,14 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
-            ORDER BY modified desc
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount 
+            FROM `tabPOS Invoice` pi
+            LEFT JOIN `tabUser` u ON pi.cashier = u.email
+            WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
+            ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, docstatus, cashier, limit, limit_start),
@@ -263,13 +266,14 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s AND cashier = %s
-            ORDER BY modified desc
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
+            FROM `tabPOS Invoice` pi
+            LEFT JOIN `tabUser` u ON pi.cashier = u.email
+            WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
+            ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, status, cashier, limit, limit_start),
@@ -295,14 +299,15 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
-            AND (invoice_printed = 1 OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = ''))
-            ORDER BY modified desc
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
+                pi.posting_date, pi.rounded_total, pi.order_type 
+            FROM `tabPOS Invoice` pi
+            LEFT JOIN `tabUser` u ON pi.cashier = u.email
+            WHERE pi.branch = %s AND pi.status = %s 
+            AND (pi.invoice_printed = 1 OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = ''))
+            ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, status, limit, limit_start),
@@ -315,14 +320,15 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number, 
-                posting_date, rounded_total, order_type 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
-            AND (invoice_printed = 0 AND restaurant_table IS NOT NULL)
-            ORDER BY modified desc
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
+                pi.posting_date, pi.rounded_total, pi.order_type 
+            FROM `tabPOS Invoice` pi
+            LEFT JOIN `tabUser` u ON pi.cashier = u.email
+            WHERE pi.branch = %s AND pi.status = %s 
+            AND (pi.invoice_printed = 0 AND pi.restaurant_table IS NOT NULL)
+            ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, docstatus, limit, limit_start),
@@ -334,13 +340,14 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount 
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
-            ORDER BY modified desc
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount 
+            FROM `tabPOS Invoice` pi
+            LEFT JOIN `tabUser` u ON pi.cashier = u.email
+            WHERE pi.branch = %s AND pi.status = %s 
+            ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, docstatus, limit, limit_start),
@@ -352,13 +359,14 @@ def getPosInvoice(status, limit, limit_start):
         invoices = frappe.db.sql(
             """
             SELECT 
-                name, invoice_printed, grand_total, restaurant_table, 
-                cashier, waiter, net_total, posting_time, 
-                total_taxes_and_charges, customer, status, mobile_number,
-                posting_date, rounded_total, order_type,additional_discount_percentage,discount_amount
-            FROM `tabPOS Invoice` 
-            WHERE branch = %s AND status = %s 
-            ORDER BY modified desc
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
+            FROM `tabPOS Invoice` pi
+            LEFT JOIN `tabUser` u ON pi.cashier = u.email
+            WHERE pi.branch = %s AND pi.status = %s 
+            ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
             (branch, status, limit, limit_start),
@@ -379,43 +387,39 @@ def searchPosInvoice(query, status):
     if not query:
         return {"data": [], "next": False}
     query = query.lower()
-    filters = {"status": "Paid" if status == "Recently Paid" else status}
 
-    # Add additional conditions for Unbilled status
-    if status == "Unbilled":
-        filters.update(
-            {
-                "status": "draft",
-                "restaurant_table": [
-                    "not in",
-                    [None, ""],
-                ],  # Check if restaurant_table has value
-                "invoice_printed": 0,  # Check if invoice_printed is 0
-            }
+    # Build the WHERE clause based on status
+    status_condition = ""
+    if status == "Recently Paid":
+        status_condition = "pi.status = 'Paid'"
+    elif status == "Unbilled":
+        status_condition = """pi.status = 'Draft' 
+        AND pi.restaurant_table IS NOT NULL 
+        AND pi.restaurant_table != '' 
+        AND pi.invoice_printed = 0"""
+    else:
+        status_condition = f"pi.status = '{status}'"
+
+    # Use SQL query to get orders with cashier full name
+    pos_invoices = frappe.db.sql(
+        f"""
+        SELECT 
+            pi.name, pi.customer, pi.grand_total, pi.posting_date, pi.posting_time,
+            pi.order_type, pi.restaurant_table, pi.status, pi.rounded_total, 
+            pi.net_total, pi.mobile_number, pi.cashier, u.full_name as cashier_name
+        FROM `tabPOS Invoice` pi
+        LEFT JOIN `tabUser` u ON pi.cashier = u.email
+        WHERE ({status_condition})
+        AND (
+            LOWER(pi.name) LIKE %s 
+            OR LOWER(pi.customer) LIKE %s 
+            OR LOWER(pi.mobile_number) LIKE %s
         )
-    pos_invoices = frappe.get_all(
-        "POS Invoice",
-        filters=filters,
-        or_filters=[
-            ["name", "like", f"%{query}%"],
-            ["customer", "like", f"%{query}%"],
-            ["mobile_number", "like", f"%{query}%"],
-        ],
-        fields=[
-            "name",
-            "customer",
-            "grand_total",
-            "posting_date",
-            "posting_time",
-            "order_type",
-            "restaurant_table",
-            "status",
-            "grand_total",
-            "rounded_total",
-            "net_total",
-            "mobile_number",
-        ],
-        limit_page_length=10,
+        ORDER BY pi.modified desc
+        LIMIT 10
+        """,
+        (f"%{query}%", f"%{query}%", f"%{query}%"),
+        as_dict=True,
     )
 
     return {"data": pos_invoices, "next": len(pos_invoices) == 10}
@@ -739,18 +743,19 @@ def getAllOrders(limit, limit_start):
     invoices = frappe.db.sql(
         """
         SELECT 
-            name, invoice_printed, grand_total, restaurant_table, 
-            cashier, waiter, net_total, posting_time, 
-            total_taxes_and_charges, customer, status, mobile_number, 
-            posting_date, rounded_total, order_type 
-        FROM `tabPOS Invoice` 
-        WHERE branch = %s AND status = 'Draft'
+            pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
+            pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+            pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
+            pi.posting_date, pi.rounded_total, pi.order_type 
+        FROM `tabPOS Invoice` pi
+        LEFT JOIN `tabUser` u ON pi.cashier = u.email
+        WHERE pi.branch = %s AND pi.status = 'Draft'
         AND (
-            invoice_printed = 1 
-            OR (invoice_printed = 0 AND COALESCE(restaurant_table, '') = '')
-            OR (invoice_printed = 0 AND order_type = 'Dine In')
+            pi.invoice_printed = 1 
+            OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = '')
+            OR (pi.invoice_printed = 0 AND pi.order_type = 'Dine In')
         )
-        ORDER BY modified desc
+        ORDER BY pi.modified desc
         LIMIT %s OFFSET %s
         """,
         (branch, limit, limit_start),
