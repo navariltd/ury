@@ -2,7 +2,7 @@ import { Globe, Phone, ShoppingBag, Truck, Utensils } from "lucide-react";
 
 export type OrderType = "Dine In" | "Take Away" | "Delivery" | "Phone In" | "Aggregators";
 
-export type OrderTypes= {
+export type OrderTypes = {
     label: string;
     value: OrderType;
     icon: React.ElementType;
@@ -36,13 +36,17 @@ export const ORDER_TYPES: OrderTypes[] = [
     }
 ]
 
-export const DINE_IN="Dine In"
-export const DEFAULT_ORDER_TYPE="Take Away"
+export const DINE_IN = "Dine In"
+export const DEFAULT_ORDER_TYPE = "Take Away"
 
-export type OrderStatusType = "Draft" | "Unbilled" | "Recently Paid" | "Paid" | "Consolidated" | "Return";
+export type OrderStatusType = "Draft" | "Unbilled" | "Recently Paid" | "Paid" | "Consolidated" | "Return" | "All Orders";
 
 // Base status types that are always available
 export const BASE_ORDER_STATUS_TYPES = [
+    {
+        label: "All Orders",
+        value: "All Orders"
+    },
     {
         label: "Draft",
         value: "Draft"
@@ -79,18 +83,18 @@ export const EXTENDED_ORDER_STATUS_TYPES = [
 
 // Function to get order status types based on POS profile settings
 export const getOrderStatusTypes = (viewAllStatus?: number, paidLimit?: number) => {
-    let statusTypes = [...BASE_ORDER_STATUS_TYPES];
-    
+    const statusTypes = [...BASE_ORDER_STATUS_TYPES];
+
     // Add Recently Paid if paid_limit > 0
     if (paidLimit && paidLimit > 0) {
         statusTypes.push(...RECENTLY_PAID_STATUS_TYPE);
     }
-    
+
     // Add extended statuses if view_all_status is enabled
     if (viewAllStatus === 1) {
         statusTypes.push(...EXTENDED_ORDER_STATUS_TYPES);
     }
-    
+
     return statusTypes;
 };
 

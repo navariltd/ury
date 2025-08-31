@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { OrderType } from '../../data/order-types';
 import { call } from '../../lib/frappe-sdk';
-import { getPOSInvoices, getPOSInvoiceItems, POSInvoiceItem, POSInvoiceTax } from '../../lib/invoice-api';
+import { getPOSInvoices, getPOSInvoiceItems, POSInvoiceItem, POSInvoiceTax, getAllOrders } from '../../lib/invoice-api';
 import { searchPosInvoice } from '../../lib/invoice-api';
 
 export interface POSInvoice {
@@ -10,6 +10,7 @@ export interface POSInvoice {
   grand_total: number;
   restaurant_table: string | null;
   cashier: string;
+  cashier_name: string;
   waiter: string;
   net_total: number;
   posting_time: string;
@@ -31,7 +32,7 @@ export interface OrdersState {
     hasNextPage: boolean;
     itemsPerPage: number;
   };
-  selectedStatus: 'Draft' | 'Unbilled' | 'Recently Paid' | 'Paid' | 'Consolidated' | 'Return';
+  selectedStatus: 'Draft' | 'Unbilled' | 'Recently Paid' | 'Paid' | 'Consolidated' | 'Return' | 'All Orders';
   selectedOrder: POSInvoice | null;
   selectedOrderItems: POSInvoiceItem[];
   selectedOrderTaxes: POSInvoiceTax[];
@@ -45,7 +46,7 @@ export interface OrdersActions {
   updateOrderStatus: (orderId: string, status: POSInvoice['status']) => Promise<void>;
   goToNextPage: () => Promise<void>;
   goToPreviousPage: () => Promise<void>;
-  setSelectedStatus: (status: POSInvoice['status']) => Promise<void>;
+  setSelectedStatus: (status: 'Draft' | 'Unbilled' | 'Recently Paid' | 'Paid' | 'Consolidated' | 'Return' | 'All Orders') => Promise<void>;
   selectOrder: (order: POSInvoice) => Promise<void>;
   clearSelectedOrder: () => void;
   setOrderSearchQuery: (query: string) => void;
@@ -83,48 +84,85 @@ export const createOrdersSlice: StateCreator<
     try {
       set({ orderLoading: true, error: null });
       const { orderSearchQuery, selectedStatus } = get();
-      
+
       // Get POS profile to access paid_limit
       const posProfile = sessionStorage.getItem('posProfile');
       const profile = posProfile ? JSON.parse(posProfile) : null;
       const paidLimit = profile?.paid_limit;
-      
+
       if (orderSearchQuery && orderSearchQuery.trim()) {
-        // Use search API
-        const res = await searchPosInvoice(orderSearchQuery, selectedStatus);
+        // Use search API - but don't search for "All Orders" status
+        if (selectedStatus === 'All Orders') {
+          // For All Orders search, we'll just fetch all orders without search
+          const limitStart = (page - 1) * ITEMS_PER_PAGE;
+          const { invoices, hasMore } = await getAllOrders({
+            limit: ITEMS_PER_PAGE,
+            limit_start: limitStart,
+          });
+          set({
+            orders: invoices,
+            pagination: {
+              currentPage: page,
+              hasNextPage: hasMore,
+              itemsPerPage: ITEMS_PER_PAGE,
+            },
+            orderLoading: false
+          });
+          return;
+        } else {
+          const res = await searchPosInvoice(orderSearchQuery, selectedStatus);
+          set({
+            orders: res.data || [],
+            pagination: {
+              currentPage: 1,
+              hasNextPage: false,
+              itemsPerPage: ITEMS_PER_PAGE,
+            },
+            orderLoading: false
+          });
+          return;
+        }
+      }
+
+      // Default fetch
+      const limitStart = (page - 1) * ITEMS_PER_PAGE;
+
+      if (selectedStatus === 'All Orders') {
+        const { invoices, hasMore } = await getAllOrders({
+          limit: ITEMS_PER_PAGE,
+          limit_start: limitStart,
+        });
         set({
-          orders: res.data || [],
+          orders: invoices,
           pagination: {
-            currentPage: 1,
-            hasNextPage: false,
+            currentPage: page,
+            hasNextPage: hasMore,
             itemsPerPage: ITEMS_PER_PAGE,
           },
           orderLoading: false
         });
-        return;
+      } else {
+        const status = selectedStatus;
+        const { invoices, hasMore } = await getPOSInvoices({
+          status,
+          limit: ITEMS_PER_PAGE,
+          limit_start: limitStart,
+          paid_limit: paidLimit
+        });
+        set({
+          orders: invoices,
+          pagination: {
+            currentPage: page,
+            hasNextPage: hasMore,
+            itemsPerPage: ITEMS_PER_PAGE,
+          },
+          orderLoading: false
+        });
       }
-      // Default fetch
-      const limitStart = (page - 1) * ITEMS_PER_PAGE;
-      const status = selectedStatus;
-      const { invoices, hasMore } = await getPOSInvoices({
-        status,
-        limit: ITEMS_PER_PAGE,
-        limit_start: limitStart,
-        paid_limit: paidLimit
-      });
-      set({ 
-        orders: invoices,
-        pagination: {
-          currentPage: page,
-          hasNextPage: hasMore,
-          itemsPerPage: ITEMS_PER_PAGE,
-        },
-        orderLoading: false 
-      });
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to fetch orders',
-        orderLoading: false 
+        orderLoading: false
       });
     }
   },
@@ -152,33 +190,33 @@ export const createOrdersSlice: StateCreator<
 
   selectOrder: async (order) => {
     try {
-      set({ 
+      set({
         selectedOrder: order,
-        selectedOrderLoading: true, 
-        selectedOrderError: null 
+        selectedOrderLoading: true,
+        selectedOrderError: null
       });
 
       const { items, taxes } = await getPOSInvoiceItems(order.name);
-      
-      set({ 
+
+      set({
         selectedOrderItems: items,
         selectedOrderTaxes: taxes,
-        selectedOrderLoading: false 
+        selectedOrderLoading: false
       });
     } catch (error) {
-      set({ 
+      set({
         selectedOrderError: error instanceof Error ? error.message : 'Failed to fetch order details',
-        selectedOrderLoading: false 
+        selectedOrderLoading: false
       });
     }
   },
 
   clearSelectedOrder: () => {
-    set({ 
+    set({
       selectedOrder: null,
       selectedOrderItems: [],
       selectedOrderTaxes: [],
-      selectedOrderError: null 
+      selectedOrderError: null
     });
   },
 
@@ -193,12 +231,12 @@ export const createOrdersSlice: StateCreator<
 
       // Refresh the orders list after status update
       await get().fetchOrders(get().pagination.currentPage);
-      
+
       set({ orderLoading: false });
     } catch (error) {
-      set({ 
+      set({
         error: error instanceof Error ? error.message : 'Failed to update order status',
-        orderLoading: false 
+        orderLoading: false
       });
     }
   },

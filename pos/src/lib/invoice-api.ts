@@ -7,6 +7,7 @@ export interface POSInvoice {
   grand_total: number;
   restaurant_table: string | null;
   cashier: string;
+  cashier_name: string;
   waiter: string;
   net_total: number;
   posting_time: string;
@@ -48,16 +49,16 @@ interface GetPOSInvoiceItemsResponse {
   message: [POSInvoiceItem[], POSInvoiceTax[]];
 }
 
-export async function getPOSInvoices({ 
-  status, 
-  limit, 
+export async function getPOSInvoices({
+  status,
+  limit,
   limit_start,
   paid_limit
 }: GetPOSInvoicesParams) {
   try {
     // Use paid_limit as the limit for Recently Paid status
     const actualLimit = status === 'Recently Paid' && paid_limit ? paid_limit : limit;
-    
+
     const response = await call.get<GetPOSInvoicesResponse>(
       'ury.ury_pos.api.getPosInvoice',
       {
@@ -109,7 +110,7 @@ export async function updateInvoiceStatus(
     console.error('Error updating invoice status:', error);
     throw new Error('Failed to update invoice status');
   }
-} 
+}
 
 export async function searchPosInvoice(query: string, status: string) {
   try {
@@ -122,7 +123,7 @@ export async function searchPosInvoice(query: string, status: string) {
     console.error('Error searching POS invoices:', error);
     throw error;
   }
-} 
+}
 
 export async function getInvoicePrintHtml(invoiceId: string, printFormat: string) {
   try {
@@ -140,7 +141,7 @@ export async function getInvoicePrintHtml(invoiceId: string, printFormat: string
     console.error('Error fetching invoice print HTML:', error);
     throw new Error('Failed to fetch invoice print HTML');
   }
-} 
+}
 
 export async function networkPrint(orderId: string, printer: string, printFormat: string) {
   await call.post('ury.ury.api.ury_print.network_printing', {
@@ -168,4 +169,30 @@ export async function printPosPage(orderId: string, printFormat: string) {
 
 export async function updatePrintStatus(orderId: string) {
   await call.post('ury.ury.api.ury_print.qz_print_update', { invoice: orderId });
-} 
+}
+
+export async function getAllOrders({
+  limit,
+  limit_start
+}: {
+  limit?: number;
+  limit_start?: number;
+}) {
+  try {
+    const response = await call.get<GetPOSInvoicesResponse>(
+      'ury.ury_pos.api.getAllOrders',
+      {
+        limit,
+        limit_start
+      }
+    );
+
+    return {
+      invoices: response.message.data,
+      hasMore: response.message.next
+    };
+  } catch (error) {
+    console.error('Error fetching all orders:', error);
+    throw new Error('Failed to fetch all orders');
+  }
+}

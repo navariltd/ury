@@ -1,25 +1,34 @@
-import { useState } from 'react';
-import { Trash2, Edit, FrownIcon, Plus, Loader2, MessageSquare } from 'lucide-react';
-import { usePOSStore } from '../store/pos-store';
-import { formatCurrency, cn } from '../lib/utils';
-import { CustomerSelect } from './CustomerSelect';
-import ProductDialog from './ProductDialog';
-import OrderTypeSelect from './OrderTypeSelect';
-import CommentDialog from './CommentDialog';
-import { Button } from './ui/button';
-import { Spinner } from './ui/spinner';
-import { syncOrder } from '../lib/order-api';
-import { useRootStore } from '../store/root-store';
-import type { RootState } from '../store/root-store';
-import { showToast } from './ui/toast';
-import { DINE_IN } from '../data/order-types';
+import { useState } from "react";
+import {
+  Trash2,
+  Edit,
+  FrownIcon,
+  Plus,
+  Loader2,
+  MessageSquare,
+  ClipboardList,
+} from "lucide-react";
+import { usePOSStore } from "../store/pos-store";
+import { formatCurrency, cn } from "../lib/utils";
+import { CustomerSelect } from "./CustomerSelect";
+import ProductDialog from "./ProductDialog";
+import OrderTypeSelect from "./OrderTypeSelect";
+import CommentDialog from "./CommentDialog";
+import { Button } from "./ui/button";
+import { Spinner } from "./ui/spinner";
+import { syncOrder } from "../lib/order-api";
+import { useRootStore } from "../store/root-store";
+import type { RootState } from "../store/root-store";
+import { showToast } from "./ui/toast";
+import { DINE_IN } from "../data/order-types";
+import { useNavigate } from "react-router-dom";
 
 const OrderPanel = () => {
-  const { 
-    activeOrders, 
-    removeFromOrder, 
-    updateQuantity, 
-    clearOrder, 
+  const {
+    activeOrders,
+    removeFromOrder,
+    updateQuantity,
+    clearOrder,
     setSelectedItem,
     orderLoading,
     isOrderInteractionDisabled,
@@ -34,16 +43,21 @@ const OrderPanel = () => {
     paymentModes,
     orderId,
     orderComment,
-    setOrderComment
+    setOrderComment,
   } = usePOSStore();
   const user = useRootStore((state: RootState) => state.user);
-  const [editingItem, setEditingItem] = useState<typeof activeOrders[0] | null>(null);
+  const { setSelectedStatus } = useRootStore();
+  const navigate = useNavigate();
+  const [editingItem, setEditingItem] = useState<
+    (typeof activeOrders)[0] | null
+  >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCommentDialog, setShowCommentDialog] = useState(false);
 
-  const calculateItemTotal = (item: typeof activeOrders[0]) => {
+  const calculateItemTotal = (item: (typeof activeOrders)[0]) => {
     const basePrice = item.selectedVariant?.price || item.price;
-    const addonsTotal = item.selectedAddons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
+    const addonsTotal =
+      item.selectedAddons?.reduce((sum, addon) => sum + addon.price, 0) || 0;
     return (basePrice + addonsTotal) * item.quantity;
   };
 
@@ -52,7 +66,7 @@ const OrderPanel = () => {
     0
   );
 
-  const handleEdit = (item: typeof activeOrders[0]) => {
+  const handleEdit = (item: (typeof activeOrders)[0]) => {
     const menuItem = {
       ...item,
       variants: item.variants,
@@ -66,24 +80,30 @@ const OrderPanel = () => {
     setOrderComment(comment);
   };
 
+  const handleViewAllOrders = async () => {
+    // Set the status to "All Orders" and navigate to orders page
+    await setSelectedStatus("All Orders");
+    navigate("/orders");
+  };
+
   const handleSubmit = async () => {
     try {
       if (!posProfile) {
-        throw new Error('POS Profile not found');
+        throw new Error("POS Profile not found");
       }
 
       if (!user?.name) {
-        throw new Error('User not logged in');
+        throw new Error("User not logged in");
       }
 
       // Validate customer/aggregator details
-      if (selectedOrderType === 'Aggregators') {
+      if (selectedOrderType === "Aggregators") {
         if (!selectedAggregator?.customer) {
-          showToast.error('Please select an aggregator before proceeding');
+          showToast.error("Please select an aggregator before proceeding");
           return;
         }
       } else if (!selectedCustomer?.name) {
-        showToast.error('Please select a customer before proceeding');
+        showToast.error("Please select a customer before proceeding");
         return;
       }
 
@@ -94,51 +114,66 @@ const OrderPanel = () => {
       }
 
       setIsSubmitting(true);
-      
+
       const orderData = {
-        items: activeOrders.map(item => ({
+        items: activeOrders.map((item) => ({
           item: item.id,
           item_name: item.name,
           rate: item.selectedVariant?.price || item.price,
           qty: item.quantity,
-          comment: item.comment || undefined
+          comment: item.comment || undefined,
         })),
         no_of_pax: 1,
         pos_profile: posProfile.name,
         order_type: selectedOrderType,
         table: selectedTable || undefined,
         room: selectedRoom || undefined,
-        customer: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : selectedCustomer?.name,
-        aggregator_id: selectedOrderType === 'Aggregators' ? selectedAggregator?.customer : undefined,
+        customer:
+          selectedOrderType === "Aggregators"
+            ? selectedAggregator?.customer
+            : selectedCustomer?.name,
+        aggregator_id:
+          selectedOrderType === "Aggregators"
+            ? selectedAggregator?.customer
+            : undefined,
         cashier: posProfile.cashier,
         owner: user.name,
         mode_of_payment: paymentModes[0],
         last_invoice: isUpdatingOrder ? orderId : null,
         invoice: isUpdatingOrder ? orderId : null,
         waiter: user.name,
-        comments: orderComment || undefined
+        comments: orderComment || undefined,
       };
 
       await syncOrder(orderData);
-      
+
       // Reset all states after successful order submission
       resetOrderState();
-      showToast.success(isUpdatingOrder ? 'Order updated successfully' : 'Order created successfully');
+      showToast.success(
+        isUpdatingOrder
+          ? "Order updated successfully"
+          : "Order created successfully"
+      );
     } catch (error) {
-      console.error('Failed to sync order:', error);
+      console.error("Failed to sync order:", error);
       // Frappe API error handling
-      if (error && typeof error === 'object' && '_server_messages' in error && typeof (error as any)._server_messages === 'string') {
+      if (
+        error &&
+        typeof error === "object" &&
+        "_server_messages" in error &&
+        typeof (error as any)._server_messages === "string"
+      ) {
         try {
           const messages = JSON.parse((error as any)._server_messages);
           const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || 'API error');
+          showToast.error(messageObj.message || "API error");
         } catch {
-          showToast.error('API error');
+          showToast.error("API error");
         }
       } else if (error instanceof Error) {
         showToast.error(error.message);
       } else {
-        showToast.error('Failed to process order');
+        showToast.error("Failed to process order");
       }
     } finally {
       setIsSubmitting(false);
@@ -150,20 +185,20 @@ const OrderPanel = () => {
       <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
         <FrownIcon className="w-12 h-12 text-gray-400" />
       </div>
-      
+
       <h3 className="text-lg font-semibold text-gray-900 mb-2">
         Your cart is empty
       </h3>
-      
+
       <p className="text-gray-500 text-sm mb-6 max-w-xs leading-relaxed">
         Add items to get started with your order
       </p>
-      
+
       <div className="flex items-center gap-2 text-blue-600 bg-blue-50 px-4 py-2 rounded-lg">
         <Plus className="w-4 h-4" />
         <span className="text-sm font-medium">Click items to add them</span>
       </div>
-      
+
       <div className="mt-4 text-xs text-gray-400">
         Double-click for customization options
       </div>
@@ -181,10 +216,26 @@ const OrderPanel = () => {
   return (
     <div className="w-96 bg-white border-l border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed right-0 z-10">
       <div className="p-4 border-b border-gray-200 flex-shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-900">Order Cart</h2>
+          <Button
+            onClick={handleViewAllOrders}
+            variant="ghost"
+            size="sm"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3 py-1.5"
+            title="View all orders"
+            disabled={isInteractionDisabled}
+          >
+            <ClipboardList className="w-4 h-4 mr-1.5" />
+            All Orders
+          </Button>
+        </div>
         <OrderTypeSelect disabled={isInteractionDisabled} />
-        <div className="mt-3"><CustomerSelect disabled={isInteractionDisabled} /></div>
+        <div className="mt-3">
+          <CustomerSelect disabled={isInteractionDisabled} />
+        </div>
       </div>
-      
+
       {orderLoading ? (
         <LoadingOrderUI />
       ) : activeOrders.length === 0 ? (
@@ -203,19 +254,27 @@ const OrderPanel = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
+                      <h3 className="font-medium text-gray-900 text-sm">
+                        {item.name}
+                      </h3>
                     </div>
                     {item.selectedVariant && (
-                      <p className="text-sm text-gray-600">{item.selectedVariant.name}</p>
+                      <p className="text-sm text-gray-600">
+                        {item.selectedVariant.name}
+                      </p>
                     )}
                     {item.selectedAddons && item.selectedAddons.length > 0 && (
                       <p className="text-sm text-gray-500">
-                        {item.selectedAddons.map(addon => addon.name).join(', ')}
+                        {item.selectedAddons
+                          .map((addon) => addon.name)
+                          .join(", ")}
                       </p>
                     )}
-                    <p className="text-gray-600 text-sm">{formatCurrency(calculateItemTotal(item))}</p>
+                    <p className="text-gray-600 text-sm">
+                      {formatCurrency(calculateItemTotal(item))}
+                    </p>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Button
                       onClick={() => handleEdit(item)}
@@ -246,7 +305,9 @@ const OrderPanel = () => {
                       </Button>
                       <span className="w-6 text-center">{item.quantity}</span>
                       <Button
-                        onClick={() => updateQuantity(item.uniqueId!, item.quantity + 1)}
+                        onClick={() =>
+                          updateQuantity(item.uniqueId!, item.quantity + 1)
+                        }
                         variant="outline"
                         size="icon"
                         className="w-8 h-8 rounded-full"
@@ -255,7 +316,7 @@ const OrderPanel = () => {
                         +
                       </Button>
                     </div>
-                    
+
                     <Button
                       onClick={() => removeFromOrder(item.uniqueId!)}
                       variant="ghost"
@@ -281,7 +342,7 @@ const OrderPanel = () => {
               </Button>
             )}
           </div>
-          
+
           <div className="p-4 border-t border-gray-200 flex-shrink-0 bg-white">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
@@ -291,7 +352,9 @@ const OrderPanel = () => {
                   size="sm"
                   className={cn(
                     "h-8 w-8 p-0",
-                    orderComment ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
+                    orderComment
+                      ? "text-blue-600"
+                      : "text-gray-500 hover:text-gray-700"
                   )}
                   disabled={isInteractionDisabled}
                   title={orderComment ? "Edit comment" : "Add comment"}
@@ -300,7 +363,9 @@ const OrderPanel = () => {
                 </Button>
                 <span className="text-lg font-semibold">Total</span>
               </div>
-              <span className="text-lg font-semibold">{formatCurrency(total)}</span>
+              <span className="text-lg font-semibold">
+                {formatCurrency(total)}
+              </span>
             </div>
             <Button
               onClick={handleSubmit}
@@ -312,12 +377,14 @@ const OrderPanel = () => {
               {isSubmitting ? (
                 <div className="flex items-center">
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {isUpdatingOrder ? 'Updating Order...' : 'Processing Order...'}
+                  {isUpdatingOrder
+                    ? "Updating Order..."
+                    : "Processing Order..."}
                 </div>
               ) : isUpdatingOrder ? (
-                'Update Order'
+                "Update Order"
               ) : (
-                'Add New Order'
+                "Add New Order"
               )}
             </Button>
           </div>
@@ -348,4 +415,4 @@ const OrderPanel = () => {
   );
 };
 
-export default OrderPanel; 
+export default OrderPanel;
