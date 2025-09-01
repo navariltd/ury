@@ -71,7 +71,7 @@ export const createOrdersSlice: StateCreator<
     hasNextPage: false,
     itemsPerPage: ITEMS_PER_PAGE,
   },
-  selectedStatus: 'Draft',
+  selectedStatus: 'All Orders',
   selectedOrder: null,
   selectedOrderItems: [],
   selectedOrderTaxes: [],
