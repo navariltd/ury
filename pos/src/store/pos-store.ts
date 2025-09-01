@@ -276,7 +276,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         profileLoading: false,
         currency: combinedProfile.currency || 'INR',
         defaultCustomer: customerData,
-        selectedCustomer: customerData,
+        selectedCustomer: get().selectedCustomer || customerData,
       });
       
       if (!storage.getItem('currencySymbol')) {
@@ -639,7 +639,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
             id: order.customer,
             name: order.customer_name,
             phone: order.mobile_number,
-          } : null,
+          } : get().selectedCustomer || get().defaultCustomer,
           isUpdatingOrder: true,
           orderId: order.name,
         });
@@ -647,7 +647,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         set({ 
           tableOrder: null,
           activeOrders: [],
-          selectedCustomer: null,
+          selectedCustomer: get().selectedCustomer || get().defaultCustomer,
           isUpdatingOrder: false,
           orderId: null,
         });
@@ -657,7 +657,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         error: 'Failed to load table order',
         tableOrder: null,
         activeOrders: [],
-        selectedCustomer: null,
+        selectedCustomer: get().selectedCustomer || get().defaultCustomer,
         isUpdatingOrder: false,
         orderId: null,
       });
@@ -670,7 +670,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     set({ 
       tableOrder: null,
       activeOrders: [],
-      selectedCustomer: null,
+      selectedCustomer: get().selectedCustomer || get().defaultCustomer,
       isUpdatingOrder: false,
       orderId: null,
     });
