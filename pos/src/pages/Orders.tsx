@@ -572,7 +572,9 @@ export default function Orders() {
                   <Button
                     className='flex-1'
                     onClick={() => {
-                      if (String(selectedOrder.invoice_printed) === "0") {
+                      if (
+                        posStore.posProfile?.require_invoice_printing &&
+                        String(selectedOrder.invoice_printed) === "0") {
                         showToast.error(
                           "Please print invoice before making payment"
                         );
