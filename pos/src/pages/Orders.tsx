@@ -193,15 +193,30 @@ export default function Orders() {
     if (!selectedOrder || !posStore.posProfile) return;
     setIsPrinting(true);
     try {
-      await printOrder({
-        orderId: selectedOrder.name,
-        posProfile: posStore.posProfile,
+      const printFormat = 
+        posStore.posProfile.print_format || "POS Invoice";
+
+      const printUrl = `/printview?doctype=POS Invoice&name=${encodeURIComponent(
+        selectedOrder.name
+      )}&format=${encodeURIComponent(printFormat)}&no_letterhead=0&_lang=en`;
+
+      // const printUrl = `/app/print/${encodeURIComponent("POS Invoice")}/${encodeURIComponent(
+      //     selectedOrder.name
+      //   )}?format=${encodeURIComponent(printFormat)}&no_letterhead=0`;
+
+      window.open(printUrl, "_blank");
+
+      // Update backend to mark invoice as printed
+      await call.post("frappe.client.set_value", {
+        doctype: "POS Invoice",
+        name: selectedOrder.name,
+        fieldname: "invoice_printed",
+        value: 1,
       });
-      showToast.success(`Printed Successfully`);
+
       // Locally update selectedOrder.invoice_printed to 1
-      if (selectedOrder && typeof selectedOrder === "object") {
-        selectOrder({ ...selectedOrder, invoice_printed: 1 });
-      }
+      selectOrder({ ...selectedOrder, invoice_printed: 1 });
+
       // If order was Unbilled, set to Draft and reload draft orders
       if (selectedStatus === "Unbilled") {
         showToast.info("Order moved to Draft after printing.");
