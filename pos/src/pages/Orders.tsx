@@ -320,7 +320,7 @@ export default function Orders() {
 
                       <div className='flex items-center gap-2 text-xs text-gray-500'>
                         <UserCheck className='w-3.5 h-3.5' />
-                        <span>{order.cashier_name || order.cashier}</span>
+                        <span>{order.waiter_name}</span>
                       </div>
 
                       {/* Total - pushed to bottom like MenuCard */}
