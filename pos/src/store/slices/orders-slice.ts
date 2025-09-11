@@ -10,7 +10,7 @@ export interface POSInvoice {
   grand_total: number;
   restaurant_table: string | null;
   cashier: string;
-  cashier_name: string;
+  waiter_name: string;
   waiter: string;
   net_total: number;
   posting_time: string;
