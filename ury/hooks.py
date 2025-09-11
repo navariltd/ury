@@ -109,23 +109,15 @@ website_route_rules = [
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-# 	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"POS Invoice": "ury.ury.hooks.ury_pos_invoice.URYPOSInvoice",
+}
 
 # Document Events
 # ---------------
 # Hook on document methods and events
 
 doc_events = {
-    "POS Invoice": {
-        "before_insert": "ury.ury.hooks.ury_pos_invoice.before_insert",
-        "validate": "ury.ury.hooks.ury_pos_invoice.validate",
-        "after_insert":"ury.ury.api.ury_kot_order_number.set_order_number",
-        "before_submit": "ury.ury.hooks.ury_pos_invoice.before_submit",
-        "on_cancel": "ury.ury.hooks.ury_pos_invoice.on_trash",
-        "on_trash": "ury.ury.hooks.ury_pos_invoice.on_trash",
-    },
     "POS Profile": {"validate": "ury.ury.hooks.ury_pos_profile.validate"},
     "Sales Invoice": {
         "before_insert": "ury.ury.hooks.ury_sales_invoice.before_insert",
@@ -354,7 +346,8 @@ fixtures = [
                     "POS Profile-custom_table_order_printer",
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
-                    "Employee-payment_type"
+                    "Employee-payment_type",
+                    "POS Profile-custom_require_invoice_printing_before_payment"
                 },
             ]
         ],
