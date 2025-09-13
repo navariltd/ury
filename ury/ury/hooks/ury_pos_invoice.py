@@ -63,34 +63,35 @@ class URYPOSInvoice(POSInvoice):
 			# If item belongs to QSR groups → validate raw materials
 			if item_group in qsr_item_groups:
 				# Find default BOM for the item
-				bom = frappe.db.get_value("BOM", {"item": d.item_code, "is_default": 1}, "name")
-				if not bom:
-					frappe.throw(
-						_("Row #{0}: No default BOM found for QSR Item {1}").format(
-							d.idx, frappe.bold(d.item_code)
+				if self.docstatus.is_draft():
+					bom = frappe.db.get_value("BOM", {"item": d.item_code, "is_default": 1}, "name")
+					if not bom:
+						frappe.throw(
+							_("Row #{0}: No default BOM found for QSR Item {1}").format(
+								d.idx, frappe.bold(d.item_code)
+							)
 						)
-					)
 
-				# Get raw materials from BOM
-				bom_items = get_bom_items_as_dict(bom, company=self.company)
-				source_warehouse = frappe.db.get_value("POS Profile", self.pos_profile, "warehouse")
+					# Get raw materials from BOM
+					bom_items = get_bom_items_as_dict(bom, company=self.company)
+					source_warehouse = frappe.db.get_value("POS Profile", self.pos_profile, "warehouse")
 
-				for rm_code, rm in bom_items.items():
-					required_qty = flt(rm["qty"]) * flt(d.stock_qty)
-					available_qty = get_stock_balance(
-						rm_code, source_warehouse, self.posting_date
-					)
-
-					if flt(available_qty) < required_qty:
-						missing_materials.append(
-							{
-								"row": d.idx,
-								"qsr_item": d.item_code,
-								"raw_material": rm_code,
-								"required": required_qty,
-								"available": available_qty,
-							}
+					for rm_code, rm in bom_items.items():
+						required_qty = flt(rm["qty"]) * flt(d.stock_qty)
+						available_qty = get_stock_balance(
+							rm_code, source_warehouse, self.posting_date
 						)
+
+						if flt(available_qty) < required_qty:
+							missing_materials.append(
+								{
+									"row": d.idx,
+									"qsr_item": d.item_code,
+									"raw_material": rm_code,
+									"required": required_qty,
+									"available": available_qty,
+								}
+							)
 
 				continue  # Skip normal stock check for QSR items
 
