@@ -744,11 +744,11 @@ def getAllOrders(limit, limit_start):
         """
         SELECT 
             pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-            pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+            pi.cashier, pi.waiter, u.full_name as waiter_name, pi.net_total, pi.posting_time, 
             pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
             pi.posting_date, pi.rounded_total, pi.order_type 
         FROM `tabPOS Invoice` pi
-        LEFT JOIN `tabUser` u ON pi.cashier = u.email
+        LEFT JOIN `tabUser` u ON pi.waiter = u.email
         WHERE pi.branch = %s AND pi.status = 'Draft'
         AND (
             pi.invoice_printed = 1 
