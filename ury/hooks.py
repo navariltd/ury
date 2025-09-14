@@ -347,7 +347,8 @@ fixtures = [
                     "POS Profile-custom_reprint_kot_format",
                     "Employee-payment_amount",
                     "Employee-payment_type",
-                    "POS Profile-custom_require_invoice_printing_before_payment"
+                    "POS Profile-custom_require_invoice_printing_before_payment",
+                    "POS Invoice-custom_skip_raw_material_validation"
                 },
             ]
         ],

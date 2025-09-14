@@ -63,7 +63,7 @@ class URYPOSInvoice(POSInvoice):
 			# If item belongs to QSR groups → validate raw materials
 			if item_group in qsr_item_groups:
 				# Find default BOM for the item
-				if self.docstatus.is_draft():
+				if self.docstatus.is_draft() and not self.skip_raw_material_validation:
 					bom = frappe.db.get_value("BOM", {"item": d.item_code, "is_default": 1}, "name")
 					if not bom:
 						frappe.throw(
@@ -132,6 +132,9 @@ class URYPOSInvoice(POSInvoice):
 				"<br>".join(messages),
 				title=_("Insufficient Raw Materials")
 			)
+		else:
+			if self.docstatus.is_draft() and qsr_item_groups and not self.skip_raw_material_validation:
+				self.skip_raw_material_validation = 1
 
 
 	def validate_invoice(self):
