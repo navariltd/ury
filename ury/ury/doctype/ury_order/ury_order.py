@@ -249,6 +249,7 @@ def sync_order(
     invoice.items = []
     
     menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
+    warehouse = frappe.db.get_value("POS Profile", pos_profile, "warehouse")
    
     for d in items:
         
@@ -278,6 +279,7 @@ def sync_order(
                     cost_center = frappe.db.get_value(
                         "POS Profile", pos_profile, "cost_center"
                         ),
+                    warehouse=warehouse,
                 ),
             )
 
