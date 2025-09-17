@@ -199,11 +199,17 @@ class URYPOSInvoice(POSInvoice):
 		self.arrived_time = self.creation
 
 		current_time_str = now()
+		creation_time = None
 		
 		current_time = datetime.strptime(current_time_str, "%Y-%m-%d %H:%M:%S.%f")
 		
-		time_difference = current_time - self.creation
-		
+		if isinstance(self.creation, str):
+			creation_time = datetime.strptime(self.creation, "%Y-%m-%d %H:%M:%S.%f")
+		else:
+			creation_time = self.creation
+
+		time_difference = current_time - creation_time
+
 		total_seconds = int(time_difference.total_seconds())
 		hours, remainder = divmod(total_seconds, 3600)
 		minutes, seconds = divmod(remainder, 60)
