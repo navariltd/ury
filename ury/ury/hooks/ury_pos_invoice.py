@@ -68,7 +68,7 @@ class URYPOSInvoice(POSInvoice):
 					if not bom:
 						frappe.throw(
 							_("Row #{0}: No default BOM found for QSR Item {1}").format(
-								d.idx, frappe.bold(d.item_code)
+								d.idx, d.item_code
 							)
 						)
 
@@ -87,7 +87,9 @@ class URYPOSInvoice(POSInvoice):
 								{
 									"row": d.idx,
 									"qsr_item": d.item_code,
+									"qsr_item_name": d.item_name,
 									"raw_material": rm_code,
+									"raw_material_name": rm["item_name"],
 									"required": required_qty,
 									"available": available_qty,
 								}
@@ -100,36 +102,36 @@ class URYPOSInvoice(POSInvoice):
 				continue
 
 			available_stock, is_stock_item = get_stock_availability(d.item_code, d.warehouse)
-			item_code, warehouse = d.item_code, d.warehouse
+			item_code, warehouse, item_name = d.item_code, d.warehouse, d.item_name
 
 			if is_stock_item and flt(available_stock) <= 0:
 				frappe.throw(
-					_("Row #{}: Item Code {} is not available under warehouse {}.").format(
-						d.idx, item_code, warehouse
+					_("Row #{}: Item [{}] {} is not available under warehouse {}.").format(
+						d.idx, item_code, item_name, warehouse
 					),
 					title=_("Item Unavailable"),
 				)
 			elif is_stock_item and flt(available_stock) < flt(d.stock_qty):
 				frappe.throw(
-					_("Row #{}: Stock quantity not enough for Item Code {} under warehouse {}.").format(
-						d.idx, item_code, warehouse
+					_("Row #{}: Stock quantity not enough for Item {} - [{}] under warehouse {}.").format(
+						d.idx, item_name, item_code, warehouse
 					),
 					title=_("Item Unavailable"),
 				)
 
 		# After checking all items → show one combined error if any raw materials are missing
 		if missing_materials:
-			messages = []
+			messages = ["Insufficient Raw Materials for the following QSR items:"]
 			for m in missing_materials:
 				messages.append(
-					_("Row #{0} | QSR Item: <b>{1}</b> → Raw Material: <b>{2}</b> "
+					_("-> Row #{0} | QSR Item: {1} Raw Material: {2} "
 					"(Required: {3}, Available: {4})").format(
-						m["row"], m["qsr_item"], m["raw_material"],
+						m["row"], m["qsr_item_name"], m["raw_material_name"],
 						m["required"], m["available"]
 					)
 				)
 			frappe.throw(
-				"<br>".join(messages),
+				"	".join(messages),
 				title=_("Insufficient Raw Materials")
 			)
 		else:
