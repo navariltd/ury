@@ -100,7 +100,7 @@ class URYPOSInvoice(POSInvoice):
 				continue
 
 			available_stock, is_stock_item = get_stock_availability(d.item_code, d.warehouse)
-			item_code, warehouse = frappe.bold(d.item_code), frappe.bold(d.warehouse)
+			item_code, warehouse = d.item_code, d.warehouse
 
 			if is_stock_item and flt(available_stock) <= 0:
 				frappe.throw(
