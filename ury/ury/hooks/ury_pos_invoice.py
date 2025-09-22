@@ -2,13 +2,14 @@ from datetime import datetime
 
 import frappe
 from frappe import _
-from frappe.utils import flt, now
+from frappe.utils import flt, now, get_datetime
 
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
 	POSInvoice,
 	get_stock_availability,
 )
-
+from erpnext.manufacturing.doctype.work_order.work_order import make_stock_entry
+from erpnext.stock.stock_ledger import NegativeStockError
 
 class URYPOSInvoice(POSInvoice):
 
@@ -29,6 +30,7 @@ class URYPOSInvoice(POSInvoice):
 		self.calculate_taxes_and_totals()
 
 	def before_submit(self):
+		self.auto_complete_work_orders()
 		self.calculate_and_set_times()
 		self.validate_invoice_print()
 		self.ro_reload_submit()
@@ -364,3 +366,66 @@ class URYPOSInvoice(POSInvoice):
 			filters={"parent": production_unit},
 			pluck="item_group",
 		)
+
+	def auto_complete_work_orders(self):
+		"""
+		Run before POS Invoice is submitted.
+		- Ensures all linked Work Orders are submitted and completed.
+		- Creates Manufacture stock entries.
+		- Marks all related URY KOTs as Served (inline KOT update).
+		"""
+
+		work_orders = frappe.get_all(
+			"Work Order",
+			filters={"kot_invoice": self.name},
+			fields=["name", "status", "docstatus"]
+		)
+
+		for wo in work_orders:
+			work_order = frappe.get_doc("Work Order", wo.name)
+
+			if work_order.docstatus == 0:
+				work_order.submit()
+				work_order.reload()
+
+			# 2. Manufacture Stock Entry
+			try:
+				stock_entry_data = make_stock_entry(work_order.name, "Manufacture")
+				stock_entry_doc = frappe.get_doc(stock_entry_data)  # Convert dict to Doc
+				stock_entry_doc.insert()
+				stock_entry_doc.submit()
+			except NegativeStockError as e:
+				frappe.throw(
+					f"Cannot auto-complete Work Order {work_order.name}: insufficient stock.\n{e}"
+				)
+
+			if work_order.status != "Completed":
+				frappe.db.set_value("Work Order", work_order.name, "status", "Completed")
+				frappe.db.set_value("Work Order", work_order.name, "actual_end_date", now())
+
+		def _mark_kot_served(kot_name):
+			kot_doc = frappe.get_doc("URY KOT", kot_name)
+
+			if kot_doc.order_status == "Served":
+				return
+
+			current_time = get_datetime()
+			production_time = current_time - kot_doc.creation
+			production_time_minutes = production_time.total_seconds() / 60
+
+			kot_doc.start_time_serv = now()
+			kot_doc.production_time = production_time_minutes
+			kot_doc.order_status = "Served"
+
+			kot_doc.save(ignore_permissions=True)
+
+		kots = frappe.get_all(
+			"URY KOT",
+			filters={"invoice": self.name},
+			fields=["name"]
+		)
+
+		for kot in kots:
+			_mark_kot_served(kot["name"])
+
+		frappe.db.commit()
