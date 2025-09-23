@@ -396,7 +396,7 @@ class URYPOSInvoice(POSInvoice):
 				stock_entry_doc.submit()
 
 				# Align stock entry posting date/time with invoice
-				invoice_dt = datetime.combine(self.posting_date, datetime.strptime(self.posting_time, "%H:%M:%S").time())
+				invoice_dt = get_datetime(f"{self.posting_date} {self.posting_time}")
 
 				if invoice_dt.time().strftime("%H:%M:%S") == "00:00:00":
 					adjusted_dt = invoice_dt
