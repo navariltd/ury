@@ -378,7 +378,7 @@ class URYPOSInvoice(POSInvoice):
 		work_orders = frappe.get_all(
 			"Work Order",
 			filters={"kot_invoice": self.name},
-			fields=["name", "status", "docstatus"]
+			fields=["name", "status", "docstatus", "qty", "produced_qty"]
 		)
 
 		for wo in work_orders:
@@ -388,9 +388,14 @@ class URYPOSInvoice(POSInvoice):
 				work_order.submit()
 				work_order.reload()
 
+			pending_qty = (work_order.qty or 0) - (work_order.produced_qty or 0)
+
+			if pending_qty <= 0 or work_order.status == "Completed":
+				continue
+
 			# 2. Manufacture Stock Entry
 			try:
-				stock_entry_data = make_stock_entry(work_order.name, "Manufacture")
+				stock_entry_data = make_stock_entry(work_order.name, "Manufacture", qty=pending_qty)
 				stock_entry_doc = frappe.get_doc(stock_entry_data)  # Convert dict to Doc
 
 				# Align stock entry posting date/time with invoice
