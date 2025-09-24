@@ -404,6 +404,9 @@ class URYPOSInvoice(POSInvoice):
 					adjusted_dt = invoice_dt
 				else:
 					adjusted_dt = invoice_dt - timedelta(seconds=1)
+
+				invoice_dt = invoice_dt + timedelta(seconds=3)
+				self.posting_time = invoice_dt.time().strftime("%H:%M:%S")
 				
 				stock_entry_doc.posting_date = adjusted_dt.date()
 				stock_entry_doc.posting_time = adjusted_dt.strftime("%H:%M:%S")
