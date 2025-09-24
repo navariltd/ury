@@ -392,25 +392,19 @@ class URYPOSInvoice(POSInvoice):
 			try:
 				stock_entry_data = make_stock_entry(work_order.name, "Manufacture")
 				stock_entry_doc = frappe.get_doc(stock_entry_data)  # Convert dict to Doc
-				stock_entry_doc.insert()
-				stock_entry_doc.submit()
 
 				# Align stock entry posting date/time with invoice
 				invoice_dt = get_datetime(f"{self.posting_date} {self.posting_time}")
-
 				if invoice_dt.time().strftime("%H:%M:%S") == "00:00:00":
 					adjusted_dt = invoice_dt
 				else:
 					adjusted_dt = invoice_dt - timedelta(seconds=1)
-
-				frappe.db.set_value(
-					"Stock Entry",
-					stock_entry_doc.name,
-					{
-						"posting_date": adjusted_dt.date(),
-						"posting_time": adjusted_dt.strftime("%H:%M:%S")
-					}
-				)
+				
+				stock_entry_doc.posting_date = adjusted_dt.date()
+				stock_entry_doc.posting_time = adjusted_dt.strftime("%H:%M:%S")
+				
+				stock_entry_doc.insert()
+				stock_entry_doc.submit()
 			except NegativeStockError as e:
 				frappe.throw(
 					f"Cannot auto-complete Work Order {work_order.name}: insufficient stock.\n{e}"
