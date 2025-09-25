@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import frappe
 from frappe import _
 from frappe.utils import flt, now, get_datetime
+from frappe.model.meta import get_field_precision
 
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
 	POSInvoice,
@@ -10,6 +11,9 @@ from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
 )
 from erpnext.manufacturing.doctype.work_order.work_order import make_stock_entry
 from erpnext.stock.stock_ledger import NegativeStockError
+from erpnext.stock.stock_ledger import is_negative_stock_allowed
+from erpnext.manufacturing.doctype.bom.bom import get_bom_items_as_dict
+from erpnext.stock.utils import get_stock_balance
 
 class URYPOSInvoice(POSInvoice):
 
@@ -39,9 +43,6 @@ class URYPOSInvoice(POSInvoice):
 		self.table_status_delete()
 
 	def validate_stock_availablility(self):
-		from erpnext.stock.stock_ledger import is_negative_stock_allowed
-		from erpnext.manufacturing.doctype.bom.bom import get_bom_items_as_dict
-		from erpnext.stock.utils import get_stock_balance
 
 		if self.is_return:
 			return
@@ -77,12 +78,13 @@ class URYPOSInvoice(POSInvoice):
 						)
 
 					# Get raw materials from BOM
-					bom_items = get_bom_items_as_dict(bom, company=self.company)
+					leaf_items = self.get_all_leaf_bom_items(bom, self.company, qsr_item_groups)
+
 					source_warehouse = frappe.db.get_value(
 						"POS Profile", self.pos_profile, "warehouse"
 					)
 
-					for rm_code, rm in bom_items.items():
+					for rm_code, rm in leaf_items.items():
 						required_qty = flt(rm["qty"]) * flt(d.stock_qty)
 						available_qty = get_stock_balance(
 							rm_code, source_warehouse, self.posting_date
@@ -147,6 +149,62 @@ class URYPOSInvoice(POSInvoice):
 				and not self.skip_raw_material_validation
 			):
 				self.skip_raw_material_validation = 1
+
+	@staticmethod
+	def get_all_leaf_bom_items(bom, company, qsr_item_groups):
+		"""
+		Recursively expand a BOM into its ultimate raw materials ("leaf items").
+
+		- If a BOM item belongs to a QSR (make-to-order) group:
+			- Try to resolve its default BOM.
+			- If found, recurse deeper until only non-QSR or QSR items with no BOM remain.
+			- If no BOM exists, throw an error for misconfigured BOM.
+		- If a BOM item is not in a QSR group:
+			- Treat it directly as a leaf raw material.
+
+		Quantities are aggregated and rounded using BOM Item precision.
+
+		Example:
+			Royal Breakfast: Spanish Omelette (QSR) - Eggs + Onions
+			Final expansion: {Eggs, Onions, ...}
+		"""
+
+		items = {}
+		bom_items = get_bom_items_as_dict(bom, company=company)
+
+		precision = get_field_precision(frappe.get_meta("BOM Item").get_field("qty"))
+
+		for rm_code, rm in bom_items.items():
+			rm_item_group = frappe.db.get_value("Item", rm_code, "item_group")
+
+			if rm_item_group in qsr_item_groups:
+				child_bom = frappe.db.get_value(
+					"BOM", {"item": rm_code, "is_default": 1}, "name"
+				)
+				if child_bom:
+					child_items = URYPOSInvoice.get_all_leaf_bom_items(
+						child_bom, company, qsr_item_groups
+					)
+					for code, child in child_items.items():
+						items[code] = items.get(code, {"qty": 0, "item_name": child["item_name"]})
+						items[code]["qty"] = flt(
+							items[code]["qty"] + (flt(child["qty"], precision) * flt(rm["qty"], precision)),
+							precision
+						)
+				else:
+					# TODO: add a check for treating QSR without BOM as leaf/raw material
+					# No BOM found: treat QSR item as leaf
+					# items[rm_code] = items.get(rm_code, {"qty": 0, "item_name": rm["item_name"]})
+					# items[rm_code]["qty"] = flt(items[rm_code]["qty"] + flt(rm["qty"], precision), precision)
+					# QSR item expected to have BOM but none found: raise error
+					frappe.throw(
+						_(f"Item {rm_code} is in a QSR group but has no default BOM. Please configure a BOM.")
+					)
+			else:
+				items[rm_code] = items.get(rm_code, {"qty": 0, "item_name": rm["item_name"]})
+				items[rm_code]["qty"] = flt(items[rm_code]["qty"] + flt(rm["qty"], precision), precision)
+
+		return items
 
 	def validate_invoice(self):
 		if self.waiter == None or self.waiter == "":
