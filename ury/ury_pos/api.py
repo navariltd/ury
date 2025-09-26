@@ -111,7 +111,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     menu_items_query = (
         frappe.qb.from_(UMI)
         .join(IT)
-        .on(UMI.item == IT.name)
+        .on(UMI.item_name == IT.item_name)
         .select(
             UMI.item,
             UMI.item_name,
