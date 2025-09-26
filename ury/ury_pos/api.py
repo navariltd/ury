@@ -1,6 +1,12 @@
 import frappe
 from frappe import _
-from datetime import date, datetime, timedelta
+from datetime import timedelta
+from frappe.query_builder import DocType
+from erpnext.accounts.doctype.pos_invoice.pos_invoice import get_stock_availability
+
+
+UMI = DocType("URY Menu Item")
+IT = DocType("Item")
 
 
 @frappe.whitelist()
@@ -26,6 +32,28 @@ def getTable(room):
 
 @frappe.whitelist()
 def getRestaurantMenu(pos_profile, room=None, order_type=None):
+    """
+    Retrieves the restaurant menu based on the provided POS profile, room, and order type.
+
+    This function determines the appropriate menu to display for a user based on their role,
+    the POS profile, the room (if specified), and the order type (if specified). It fetches
+    the menu items, including their details and images, and returns them along with the menu's
+    last modified time and name.
+
+    Args:
+        pos_profile (str): The name of the POS Profile document.
+        room (str, optional): The room identifier to filter the menu by room. Defaults to None.
+        order_type (str, optional): The order type to filter the menu by order type. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing:
+            - "items": List of menu items with details and images.
+            - "modified_time": The last modified timestamp of the menu.
+            - "name": The name of the selected menu.
+
+    Raises:
+        frappe.exceptions.ValidationError: If no active menu is set for the restaurant.
+    """
     menu_items = []
     menu_items_with_image = []
 
@@ -79,30 +107,74 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         frappe.throw(
             _("Please set an active menu for Restaurant {0}").format(restaurant)
         )
-
-    # Get menu items (your existing code)
-    menu_items = frappe.get_all(
-        "URY Menu Item",
-        filters={"parent": menu, "disabled": 0},
-        fields=["item", "item_name", "rate", "special_dish", "disabled", "course"],
-        order_by="item_name asc",
+    
+    menu_items_query = (
+        frappe.qb.from_(UMI)
+        .join(IT)
+        .on(UMI.item == IT.name)
+        .select(
+            UMI.item,
+            UMI.item_name,
+            UMI.rate,
+            UMI.special_dish,
+            UMI.disabled,
+            UMI.course,
+            IT.image,
+            IT.item_code
+        )
     )
 
-    menu_items_with_image = [
+    # Get menu items (your existing code)
+    # menu_items = frappe.get_all(
+    #     "URY Menu Item",
+    #     filters={"parent": menu, "disabled": 0},
+    #     fields=["item", "item_name", "rate", "special_dish", "disabled", "course"],
+    #     order_by="item_name asc",
+    # )
+
+    # menu_items_with_image = [
+    #     {
+    #         "item": item.item,
+    #         "item_name": item.item_name,
+    #         "rate": item.rate,
+    #         "special_dish": item.special_dish,
+    #         "disabled": item.disabled,
+    #         "item_image": frappe.db.get_value("Item", item.item, "image"),
+    #         "course": item.course,
+    #         "stock_balance": get_available_stock_quantity(item.item_name, pos_profile.warehouse)
+    #     }
+    #     for item in menu_items
+    # ]
+
+    menu_items = menu_items_query.run(as_dict=True)
+
+    menu_items_with_stock_count = [
         {
             "item": item.item,
             "item_name": item.item_name,
             "rate": item.rate,
             "special_dish": item.special_dish,
             "disabled": item.disabled,
-            "item_image": frappe.db.get_value("Item", item.item, "image"),
+            "item_image": item.image,
             "course": item.course,
+            "stock_balance": get_stock_availability(item.item_code, pos_profile.warehouse)[0]
         }
-        for item in menu_items
+        for item in menu_items if not item.disabled
     ]
+
+    filtered_menu_items = []
+    
+    # if pos_profile.hide_unavailable_items hide items with zero stock
+    if pos_profile.hide_unavailable_items:
+        filtered_menu_items = [
+            item for item in menu_items_with_stock_count if item["stock_balance"] > 0
+        ]
+    else:
+        filtered_menu_items = menu_items_with_stock_count
+
     modified = frappe.db.get_value("URY Menu", menu, "modified")
 
-    return {"items": menu_items_with_image, "modified_time": modified, "name": menu}
+    return {"items": filtered_menu_items, "modified_time": modified, "name": menu}
 
 
 @frappe.whitelist()
