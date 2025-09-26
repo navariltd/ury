@@ -413,7 +413,7 @@ class URYPOSInvoice(POSInvoice):
 		Get all item groups linked to the URY Production Unit assigned to this POS Profile.
 		"""
 		production_unit = frappe.db.get_value(
-			"URY Production Unit", {"pos_profile", pos_profile}, "name"
+			"URY Production Unit", {"pos_profile": pos_profile}, "name"
 		)
 
 		if not production_unit:
