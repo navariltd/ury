@@ -23,15 +23,15 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
       try {
         // find open POS Opening Entry
         const opening = await checkPOSOpening();
-        if (!opening?.message) {
+        if (!opening?.opening_entry) {
           setError("No active POS opening entry found.");
           return;
         }
-        setOpeningEntry(opening.message.opening_entry);
+        setOpeningEntry(opening.opening_entry);
 
         // Preview the summary
         const res = await call.get("ury.ury_pos.api.get_closing_preview", {
-          pos_opening_entry: opening.message.opening_entry,
+          pos_opening_entry: opening.opening_entry,
         });
 
         if (res.message) {
@@ -119,7 +119,7 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
             )}
 
           {/* Summary by Waiter */}
-          {summary?.waiter_summary?.length > 0 && (
+          {/* {summary?.waiter_summary?.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
                 <Users className="w-5 h-5" /> Summary by Waiter
@@ -135,7 +135,7 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
                 ))}
               </ul>
             </div>
-          )}
+          )} */}
 
           {/* Payments */}
           {summary?.payments?.length > 0 && (

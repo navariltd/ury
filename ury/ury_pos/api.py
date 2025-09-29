@@ -641,10 +641,17 @@ def posOpening():
         fields=["name", "docstatus", "status", "posting_date"],
         filters={"branch": branchName, "status": "Open", "docstatus": 1, "user": frappe.session.user},
     )
+    print(pos_opening_list)
     if not pos_opening_list:
-        frappe.throw("No open POS Opening Entry found. Please open the POS before continuing.")
+        return {
+            "status": "not_opened",
+            "opening_entry": None
+        }
     
-    return {"opening_entry": pos_opening_list[0].name}
+    return {
+        "status": "open",
+        "opening_entry": pos_opening_list[0].name
+    }
 
 
 @frappe.whitelist()
@@ -727,6 +734,7 @@ def validate_pos_close(pos_profile):
                 "status": "Open",
                 "pos_profile": pos_profile,
                 "docstatus": 1,
+                "user": frappe.session.user,
             },
         )
 

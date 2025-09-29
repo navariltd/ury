@@ -1,10 +1,11 @@
-import { RefreshCw, AlertTriangle } from 'lucide-react';
+import { RefreshCw, AlertTriangle, MonitorX } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from './ui';
 import { call } from '../lib/frappe-sdk';
 import { getCombinedPosProfile } from '../lib/pos-profile-api';
 import CurrencyInput from 'react-currency-input-field';
 import { getCurrencySymbol } from '../lib/utils';
+import POSClosingDialog from './POSClosingDialog';
 
 interface POSOpeningDialogProps {
   onReload: () => void;
@@ -14,9 +15,15 @@ interface POSOpeningDialogProps {
 const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
   const isOpeningIssue = type === 'opening';
   const [showForm, setShowForm] = useState(false);
+  const [showClosingDialog, setShowClosingDialog] = useState(false);
   const [profile, setProfile] = useState<any[]>([]);
   const [balanceDetails, setBalanceDetails] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const handleClosedPOS = () => {
+    setShowClosingDialog(false);
+    onReload();
+  }
 
   // When form opens, fetch profile and payment methods
   useEffect(() => {
@@ -71,7 +78,10 @@ const POSOpeningDialog = ({ onReload, type }: POSOpeningDialogProps) => {
 return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-8 max-w-3xl w-full mx-4 shadow-xl">
-        {!showForm ? (
+        {/* If user needs to close yesterday's POS  */}
+        {type === "closing" && showClosingDialog ? (
+          <POSClosingDialog onClose={handleClosedPOS} user={null} />
+        ) : !showForm ? (
           <div className="text-center">
             {/* Icon */}
             <div
@@ -99,19 +109,40 @@ return (
 
             {/* Buttons */}
             <div className="space-y-3">
-              <Button onClick={onReload} className="w-full bg-blue-600 text-white">
-                <RefreshCw className="w-5 h-5 mr-2" />
-                Reload Page
-              </Button>
-
-              {isOpeningIssue && (
-                <Button
-                  onClick={() => setShowForm(true)}
-                  variant="outline"
-                  className="w-full border-gray-300 text-gray-700"
-                >
-                  Open POS Entry
-                </Button>
+              {isOpeningIssue ? (
+                <>
+                  <Button 
+                    onClick={onReload} 
+                    className="w-full bg-blue-600 text-white"
+                  >
+                    <RefreshCw className="w-5 h-5 mr-2" />
+                    Reload Page
+                  </Button>
+                  <Button
+                    onClick={() => setShowForm(true)}
+                    variant="outline"
+                    className="w-full border-gray-300 text-gray-700"
+                  >
+                    Open POS Entry
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button 
+                      onClick={onReload} 
+                      className="w-full bg-blue-600 text-white"
+                    >
+                      <RefreshCw className="w-5 h-5 mr-2" />
+                      Reload Page
+                  </Button>
+                  <Button
+                    onClick={() => setShowClosingDialog(true)}
+                    className="w-full bg-orange-600 text-white"
+                  >
+                    <MonitorX className="w-5 h-5 mr-2" />
+                    Close Previous POS
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -135,9 +166,9 @@ return (
                   decimalsLimit={2}
                   prefix={getCurrencySymbol() + " "}
                   defaultValue={0}
-                  onValueChange={(e) => {
+                  onValueChange={(value) => {
                     const updated = [...balanceDetails];
-                    updated[idx].opening_amount = parseFloat(e.target.value) || 0;
+                    updated[idx].opening_amount = parseFloat(value) || 0;
                     setBalanceDetails(updated);
                   }}
                 />

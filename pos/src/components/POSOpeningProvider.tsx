@@ -20,7 +20,8 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       
       // First check if POS is opened
       const openingResponse = await checkPOSOpening();
-      if (openingResponse.message === 1) {
+      console.log(openingResponse);
+      if (openingResponse.status === "not_opened") {
         // POS is not opened
         setValidationType('opening');
         return;
