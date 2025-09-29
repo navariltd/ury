@@ -199,7 +199,7 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
             ) : !summary ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Closing...
+                Loading summary...
               </span>
             ): (
               "Confirm Close"
