@@ -5,6 +5,7 @@ import {
   User,
   ChevronDown,
   Monitor,
+  MonitorX,
   LogOut,
   RefreshCw,
 } from 'lucide-react';
@@ -14,6 +15,7 @@ import { usePOSStore } from '../store/pos-store';
 import type { RootState } from '../store/root-store';
 import { logout } from '../lib/auth-api';
 import { showToast } from './ui/toast';
+import POSClosingDialog from './POSClosingDialog';
 
 const Header = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -24,6 +26,7 @@ const Header = () => {
   const { searchQuery, setSearchQuery } = usePOSStore();
   const { orderSearchQuery, setOrderSearchQuery } = useRootStore();
   const [orderSearchInput, setOrderSearchInput] = useState(orderSearchQuery);
+  const [showClosingModal, setShowClosingModal] = useState(false);
 
   // Determine placeholder and handlers based on route
   let searchPlaceholder = 'Search orders, menu items, or customers...';
@@ -173,6 +176,13 @@ const Header = () => {
                   </Button>
                   <Button
                     variant="ghost"
+                    className="flex justify-start items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    onClick={() => setShowClosingModal(true)}>
+                      <MonitorX className='w-4 h-4 mr-3' />
+                      Close POS
+                  </Button>
+                  <Button
+                    variant="ghost"
                     className="flex justify-start items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                     onClick={handleLogout}
                   >
@@ -185,6 +195,13 @@ const Header = () => {
           </div>
         </div>
       </div>
+      
+      {showClosingModal && (
+        <POSClosingDialog
+        onClose={() => setShowClosingModal(false)}
+        user={user}
+        />
+      )}
     </header>
   );
 };

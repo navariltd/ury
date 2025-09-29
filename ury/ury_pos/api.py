@@ -1,6 +1,15 @@
+import json
+from datetime import date, datetime, timedelta
+
+
 import frappe
 from frappe import _
-from datetime import date, datetime, timedelta
+from frappe.utils import flt, get_datetime
+
+from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
+    make_closing_entry_from_opening,
+    get_pos_invoices
+)
 
 
 @frappe.whitelist()
@@ -630,15 +639,19 @@ def posOpening():
     pos_opening_list = frappe.get_all(
         "POS Opening Entry",
         fields=["name", "docstatus", "status", "posting_date"],
-        filters={"branch": branchName},
+        filters={"branch": branchName, "status": "Open", "docstatus": 1, "user": frappe.session.user},
     )
-    flag = 1
-    for pos_opening in pos_opening_list:
-        if pos_opening.status == "Open" and pos_opening.docstatus == 1:
-            flag = 0
-    if flag == 1:
-        frappe.msgprint(title="Message", indicator="red", msg=("Please Open POS Entry"))
-    return flag
+    print(pos_opening_list)
+    if not pos_opening_list:
+        return {
+            "status": "not_opened",
+            "opening_entry": None
+        }
+    
+    return {
+        "status": "open",
+        "opening_entry": pos_opening_list[0].name
+    }
 
 
 @frappe.whitelist()
@@ -721,6 +734,7 @@ def validate_pos_close(pos_profile):
                 "status": "Open",
                 "pos_profile": pos_profile,
                 "docstatus": 1,
+                "user": frappe.session.user,
             },
         )
 
@@ -770,3 +784,84 @@ def getAllOrders(limit, limit_start):
         next = False
 
     return {"data": updatedlist, "next": next}
+
+@frappe.whitelist()
+def create_opening_voucher(company: str, pos_profile: str, balance_details: list):
+    try:
+        
+        new_pos_opening = frappe.get_doc(
+            {
+                "doctype": "POS Opening Entry",
+                "period_start_date": frappe.utils.get_datetime(),
+                "posting_date": frappe.utils.getdate(),
+                "user": frappe.session.user,
+                "pos_profile": pos_profile,
+                "company": company,
+            }
+        )
+        new_pos_opening.set("balance_details", balance_details)
+        new_pos_opening.submit()
+
+        return {"status": "success", "opening_entry": new_pos_opening.name}
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "POS Opening Creation Failed")
+        return {"status": "error", "message": str(e)}
+
+@frappe.whitelist()
+def get_closing_preview(pos_opening_entry: str):
+    """Return a preview summary for the dialog (doesn't save anything)."""
+    opening_entry = frappe.get_doc("POS Opening Entry", pos_opening_entry)
+    closing_entry = make_closing_entry_from_opening(opening_entry)
+
+    # waiter summary
+    invoices = get_pos_invoices(
+        closing_entry.period_start_date,
+        closing_entry.period_end_date,
+        closing_entry.pos_profile,
+        closing_entry.user,
+    )
+    waiter_map = {}
+    for inv in invoices:
+        waiter = inv.get("owner") or "Unassigned"
+        if waiter not in waiter_map:
+            waiter_map[waiter] = {"waiter": waiter, "total": 0.0, "invoices": 0}
+        waiter_map[waiter]["invoices"] += 1
+        waiter_map[waiter]["total"] += flt(inv.get("grand_total") or 0.0)
+
+    waiter_summary = list(waiter_map.values())
+    # Convert child tables on the closing_entry into serializable dicts
+    payment_reconciliation = [p.as_dict() for p in closing_entry.payment_reconciliation]
+    taxes = [t.as_dict() for t in closing_entry.taxes]
+    pos_transactions = [p.as_dict() for p in closing_entry.pos_transactions]
+
+    return {
+        "grand_total": closing_entry.grand_total,
+        "net_total": closing_entry.net_total,
+        "total_quantity": closing_entry.total_quantity,
+        "taxes": taxes,
+        "payments": payment_reconciliation,
+        "pos_transactions": pos_transactions,
+        "waiter_summary": waiter_summary,
+    }
+
+
+@frappe.whitelist()
+def submit_pos_closing(pos_opening_entry: str, closing_amounts: list = None):
+    """Actually create & submit a POS Closing Entry."""
+    try:
+        opening_entry = frappe.get_doc("POS Opening Entry", pos_opening_entry)
+        closing_entry = make_closing_entry_from_opening(opening_entry)
+
+        # inject actual amounts
+        if closing_amounts:
+            closing_map = {p["mode_of_payment"]: p["closing_amount"] for p in closing_amounts}
+            for row in closing_entry.payment_reconciliation:
+                row.closing_amount = closing_map.get(row.mode_of_payment, 0)
+                row.difference = row.closing_amount - row.expected_amount
+        
+        closing_entry.insert(ignore_permissions=True)
+        closing_entry.submit()
+        return {"status": "success", "closing_entry": closing_entry.name}
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "POS Closing Failed")
+        return {"status": "error", "message": str(e)}

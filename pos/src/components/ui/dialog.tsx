@@ -68,10 +68,24 @@ export interface DialogProps
     VariantProps<typeof dialogVariants> {
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  dismissible?: boolean
 }
 
 const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
-  ({ className, variant, open, onOpenChange, children, ...props }, ref) => {
+  ({ className, variant, open, onOpenChange, dismissible = true, children, ...props }, ref) => {
+    // Escape Key handling
+    React.useEffect(() => {
+      const handler = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          e.preventDefault()
+          // only close if dismissible
+          if (dismissible) onOpenChange?.(false)
+        }
+      }
+      document.addEventListener("keydown", handler)
+      return () => document.removeEventListener("keydown", handler)
+    }, [dismissible, onOpenChange])
+
     if (!open) return null
 
     return (
@@ -82,7 +96,9 @@ const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
       >
         <div
           className={cn(overlayVariants({ variant }))}
-          onClick={() => onOpenChange?.(false)}
+          onClick={() => {
+            if (dismissible) onOpenChange?.(false)
+          }}
         />
         {children}
       </div>

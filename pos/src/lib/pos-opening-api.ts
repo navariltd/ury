@@ -1,7 +1,12 @@
 import { call } from './frappe-sdk';
 
+export interface POSOpeningStatus {
+  status: 'not_opened' | 'open';
+  opening_entry: string | null;
+}
+
 export interface POSOpeningResponse {
-  message: number;
+  message: POSOpeningStatus;
 }
 
 export interface POSCloseValidationResponse {
@@ -14,7 +19,7 @@ export const checkPOSOpening = async (): Promise<POSOpeningResponse> => {
       'ury.ury_pos.api.posOpening'
     );
     
-    return response;
+    return response.message;
   } catch (error) {
     console.error('Error checking POS opening status:', error);
     throw error;
