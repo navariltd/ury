@@ -567,17 +567,16 @@ export default function Orders() {
               <div className='flex items-center gap-3 w-full'>
                 {/* Print Icon Button */}
                 <Button
-                  variant='outline'
-                  size='icon'
-                  className='flex-shrink-0'
+                  size="icon"
+                  className="flex-shrink-0 bg-blue-100 hover:bg-blue-200 text-blue-700"
                   onClick={handlePrintOrder}
-                  aria-label='Print'
+                  aria-label="Print"
                   disabled={isPrinting}
-                >
+                  >
                   {isPrinting ? (
-                    <Spinner className='w-5 h-5' hideMessage />
+                    <Spinner className="w-5 h-5" hideMessage />
                   ) : (
-                    <Printer className='w-5 h-5' />
+                    <Printer className="w-5 h-5" />
                   )}
                 </Button>
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
