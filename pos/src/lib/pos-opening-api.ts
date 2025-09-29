@@ -1,7 +1,7 @@
 import { call } from './frappe-sdk';
 
 export interface POSOpeningResponse {
-  message: number;
+  opening_entry: string | null;
 }
 
 export interface POSCloseValidationResponse {

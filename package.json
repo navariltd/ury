@@ -12,5 +12,8 @@
   },
   "devDependencies": {
     "@types/qz-tray": "^2.2.2"
+  },
+  "dependencies": {
+    "react-currency-input-field": "^4.0.2"
   }
 }
