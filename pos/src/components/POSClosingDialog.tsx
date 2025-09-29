@@ -188,7 +188,7 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
         <div className="p-4 border-t border-gray-200">
           <Button
             onClick={handleClosePOS}
-            disabled={isProcessing || !openingEntry}
+            disabled={isProcessing || !openingEntry || !summary}
             className="w-full"
           >
             {isProcessing ? (
@@ -196,7 +196,12 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Closing...
               </span>
-            ) : (
+            ) : !summary ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Closing...
+              </span>
+            ): (
               "Confirm Close"
             )}
           </Button>
