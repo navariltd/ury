@@ -111,7 +111,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     menu_items_query = (
         frappe.qb.from_(UMI)
         .join(IT)
-        .on(UMI.item_name == IT.item_name)
+        .on(UMI.item == IT.name)
         .select(
             UMI.item,
             UMI.item_name,
@@ -119,9 +119,11 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             UMI.special_dish,
             UMI.disabled,
             UMI.course,
-            IT.image,
-            IT.item_code
+            IT.image.as_("item_image"),
+            IT.item_code.as_("item_code")
         )
+        .where(UMI.parent == menu)
+        .where(UMI.disabled == 0)
     )
 
     # Get menu items (your existing code)
