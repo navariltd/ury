@@ -326,7 +326,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         course: item.course,
         description: item.description || '',
         special_dish: item.special_dish || 0,
-        stock_balance: item.stock_balance || 0,
+        stock_balance: item.stock_balance,
         tax_rate: 0,
       }));
 

@@ -8,7 +8,7 @@ interface MenuCardProps {
   item_image: string | null;
   course?: string;
   item: string;
-  stock_balance?: number | 0;
+  stock_balance?: number | null;
   onClick?: () => void;
   disabled?: boolean;
 }

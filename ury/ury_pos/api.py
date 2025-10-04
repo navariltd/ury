@@ -59,10 +59,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         frappe.exceptions.ValidationError: If no active menu is set for the restaurant.
     """
     menu_items = []
-    menu_items_with_image = []
-
     user_role = frappe.get_roles()
-
     pos_profile = frappe.get_doc("POS Profile", pos_profile)
 
     cashier = any(
@@ -125,32 +122,11 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             UMI.course,
             IT.image.as_("item_image"),
             IT.item_code.as_("item_code"),
+            IT.default_bom
         )
         .where(UMI.parent == menu)
         .where(UMI.disabled == 0)
     )
-
-    # Get menu items (your existing code)
-    # menu_items = frappe.get_all(
-    #     "URY Menu Item",
-    #     filters={"parent": menu, "disabled": 0},
-    #     fields=["item", "item_name", "rate", "special_dish", "disabled", "course"],
-    #     order_by="item_name asc",
-    # )
-
-    # menu_items_with_image = [
-    #     {
-    #         "item": item.item,
-    #         "item_name": item.item_name,
-    #         "rate": item.rate,
-    #         "special_dish": item.special_dish,
-    #         "disabled": item.disabled,
-    #         "item_image": frappe.db.get_value("Item", item.item, "image"),
-    #         "course": item.course,
-    #         "stock_balance": get_available_stock_quantity(item.item_name, pos_profile.warehouse)
-    #     }
-    #     for item in menu_items
-    # ]
 
     menu_items = menu_items_query.run(as_dict=True)
 
@@ -165,24 +141,19 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             "course": item.course,
             "stock_balance": get_stock_availability(
                 item.item_code, pos_profile.warehouse
-            )[0],
+            )[0] if not item.default_bom else None # Check stock only if item does not have a BOM
         }
         for item in menu_items
         if not item.disabled
     ]
 
-    for item in menu_items_with_stock_count:
-        # Debug: Log the stock balance data
-        print(
-            f"Item: {item['item_name']}, Stock Balance: {item['stock_balance']}, Type: {type(item['stock_balance'])}"
-        )
-
     filtered_menu_items = []
 
     # if pos_profile.hide_unavailable_items hide items with zero stock
     if pos_profile.hide_unavailable_items:
+        # Filter out None manufactured items with zero stock
         filtered_menu_items = [
-            item for item in menu_items_with_stock_count if item["stock_balance"] > 0
+            item for item in menu_items_with_stock_count if item["stock_balance"] is None or item["stock_balance"] > 0
         ]
     else:
         filtered_menu_items = menu_items_with_stock_count
