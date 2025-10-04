@@ -37,6 +37,7 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
   selectedAddons?: Array<{ id: string; name: string; price: number }>;
   uniqueId?: string;
   tax_rate?: number;
+  stock_balance?: number;
 }
 
 export interface Customer {
@@ -325,6 +326,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
         course: item.course,
         description: item.description || '',
         special_dish: item.special_dish || 0,
+        stock_balance: item.stock_balance || 0,
         tax_rate: 0,
       }));
 

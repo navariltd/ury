@@ -111,7 +111,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         frappe.throw(
             _("Please set an active menu for Restaurant {0}").format(restaurant)
         )
-    
+
     menu_items_query = (
         frappe.qb.from_(UMI)
         .join(IT)
@@ -124,7 +124,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             UMI.disabled,
             UMI.course,
             IT.image.as_("item_image"),
-            IT.item_code.as_("item_code")
+            IT.item_code.as_("item_code"),
         )
         .where(UMI.parent == menu)
         .where(UMI.disabled == 0)
@@ -161,15 +161,24 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             "rate": item.rate,
             "special_dish": item.special_dish,
             "disabled": item.disabled,
-            "item_image": item.image,
+            "item_image": item.item_image,
             "course": item.course,
-            "stock_balance": get_stock_availability(item.item_code, pos_profile.warehouse)[0]
+            "stock_balance": get_stock_availability(
+                item.item_code, pos_profile.warehouse
+            )[0],
         }
-        for item in menu_items if not item.disabled
+        for item in menu_items
+        if not item.disabled
     ]
 
+    for item in menu_items_with_stock_count:
+        # Debug: Log the stock balance data
+        print(
+            f"Item: {item['item_name']}, Stock Balance: {item['stock_balance']}, Type: {type(item['stock_balance'])}"
+        )
+
     filtered_menu_items = []
-    
+
     # if pos_profile.hide_unavailable_items hide items with zero stock
     if pos_profile.hide_unavailable_items:
         filtered_menu_items = [
@@ -708,19 +717,18 @@ def posOpening():
     pos_opening_list = frappe.get_all(
         "POS Opening Entry",
         fields=["name", "docstatus", "status", "posting_date"],
-        filters={"branch": branchName, "status": "Open", "docstatus": 1, "user": frappe.session.user},
+        filters={
+            "branch": branchName,
+            "status": "Open",
+            "docstatus": 1,
+            "user": frappe.session.user,
+        },
     )
     print(pos_opening_list)
     if not pos_opening_list:
-        return {
-            "status": "not_opened",
-            "opening_entry": None
-        }
-    
-    return {
-        "status": "open",
-        "opening_entry": pos_opening_list[0].name
-    }
+        return {"status": "not_opened", "opening_entry": None}
+
+    return {"status": "open", "opening_entry": pos_opening_list[0].name}
 
 
 @frappe.whitelist()
@@ -854,10 +862,11 @@ def getAllOrders(limit, limit_start):
 
     return {"data": updatedlist, "next": next}
 
+
 @frappe.whitelist()
 def create_opening_voucher(company: str, pos_profile: str, balance_details: list):
     try:
-        
+
         new_pos_opening = frappe.get_doc(
             {
                 "doctype": "POS Opening Entry",
@@ -875,6 +884,7 @@ def create_opening_voucher(company: str, pos_profile: str, balance_details: list
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "POS Opening Creation Failed")
         return {"status": "error", "message": str(e)}
+
 
 @frappe.whitelist()
 def get_closing_preview(pos_opening_entry: str):
@@ -923,11 +933,13 @@ def submit_pos_closing(pos_opening_entry: str, closing_amounts: list = None):
 
         # inject actual amounts
         if closing_amounts:
-            closing_map = {p["mode_of_payment"]: p["closing_amount"] for p in closing_amounts}
+            closing_map = {
+                p["mode_of_payment"]: p["closing_amount"] for p in closing_amounts
+            }
             for row in closing_entry.payment_reconciliation:
                 row.closing_amount = closing_map.get(row.mode_of_payment, 0)
                 row.difference = row.closing_amount - row.expected_amount
-        
+
         closing_entry.insert(ignore_permissions=True)
         closing_entry.submit()
         return {"status": "success", "closing_entry": closing_entry.name}

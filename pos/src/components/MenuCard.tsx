@@ -8,22 +8,32 @@ interface MenuCardProps {
   item_image: string | null;
   course?: string;
   item: string;
-  stock_balance?: number;
+  stock_balance?: number | 0;
   onClick?: () => void;
   disabled?: boolean;
 }
 
 const MenuCard: FC<MenuCardProps> = ({
-  id,
   name,
   price,
   item_image,
   course,
-  item,
   onClick,
   disabled,
   stock_balance,
 }) => {
+  // Debug logging to check stock_balance and other props
+  console.log("MenuCard props:", {
+    name,
+    price,
+    stock_balance,
+    stock_balance_type: typeof stock_balance,
+    stock_balance_is_null: stock_balance === null,
+    stock_balance_is_undefined: stock_balance === undefined,
+    course,
+    disabled,
+  });
+
   return (
     <div
       className={cn(
