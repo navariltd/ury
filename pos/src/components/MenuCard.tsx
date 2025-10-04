@@ -22,18 +22,6 @@ const MenuCard: FC<MenuCardProps> = ({
   disabled,
   stock_balance,
 }) => {
-  // Debug logging to check stock_balance and other props
-  console.log("MenuCard props:", {
-    name,
-    price,
-    stock_balance,
-    stock_balance_type: typeof stock_balance,
-    stock_balance_is_null: stock_balance === null,
-    stock_balance_is_undefined: stock_balance === undefined,
-    course,
-    disabled,
-  });
-
   return (
     <div
       className={cn(
@@ -73,7 +61,7 @@ const MenuCard: FC<MenuCardProps> = ({
           <div
             className={cn(
               "absolute top-1 right-1 px-2 py-0.5 rounded text-[10px] font-semibold shadow-sm",
-              stock_balance > 5 && "bg-white/90 text-gray-700",
+              stock_balance > 5 && "bg-green-500 text-white",
               stock_balance <= 5 &&
                 stock_balance > 0 &&
                 "bg-amber-500 text-white",
