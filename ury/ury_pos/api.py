@@ -60,10 +60,10 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     """
     menu_items = []
     user_role = frappe.get_roles()
-    pos_profile = frappe.get_doc("POS Profile", pos_profile)
+    pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
 
     cashier = any(
-        role.role in user_role for role in pos_profile.role_allowed_for_billing
+        role.role in user_role for role in pos_profile_doc.role_allowed_for_billing
     )
     branch_name = getBranch()
     restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
@@ -109,6 +109,9 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             _("Please set an active menu for Restaurant {0}").format(restaurant)
         )
 
+    # Get QSR item groups for this POS Profile
+    qsr_item_groups = get_qsr_item_groups(pos_profile)
+
     menu_items_query = (
         frappe.qb.from_(UMI)
         .join(IT)
@@ -122,7 +125,8 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             UMI.course,
             IT.image.as_("item_image"),
             IT.item_code.as_("item_code"),
-            IT.default_bom
+            IT.default_bom,
+            IT.item_group,
         )
         .where(UMI.parent == menu)
         .where(UMI.disabled == 0)
@@ -130,30 +134,46 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 
     menu_items = menu_items_query.run(as_dict=True)
 
-    menu_items_with_stock_count = [
-        {
-            "item": item.item,
-            "item_name": item.item_name,
-            "rate": item.rate,
-            "special_dish": item.special_dish,
-            "disabled": item.disabled,
-            "item_image": item.item_image,
-            "course": item.course,
-            "stock_balance": get_stock_availability(
-                item.item_code, pos_profile.warehouse
-            )[0] if not item.default_bom else None # Check stock only if item does not have a BOM
-        }
-        for item in menu_items
-        if not item.disabled
-    ]
+    menu_items_with_stock_count = []
+    for item in menu_items:
+        if item.disabled:
+            continue
+
+        # Check if item belongs to QSR item groups
+        if item.item_group in qsr_item_groups:
+            stock_balance = "QSR"
+        else:
+            # Check stock only if item does not have a BOM
+            stock_balance = (
+                get_stock_availability(item.item_code, pos_profile_doc.warehouse)[0]
+                if not item.default_bom
+                else None
+            )
+
+        menu_items_with_stock_count.append(
+            {
+                "item": item.item,
+                "item_name": item.item_name,
+                "rate": item.rate,
+                "special_dish": item.special_dish,
+                "disabled": item.disabled,
+                "item_image": item.item_image,
+                "course": item.course,
+                "stock_balance": stock_balance,
+            }
+        )
 
     filtered_menu_items = []
 
     # if pos_profile.hide_unavailable_items hide items with zero stock
-    if pos_profile.hide_unavailable_items:
-        # Filter out None manufactured items with zero stock
+    if pos_profile_doc.hide_unavailable_items:
+        # Filter out items with zero stock, but keep QSR items
         filtered_menu_items = [
-            item for item in menu_items_with_stock_count if item["stock_balance"] is None or item["stock_balance"] > 0
+            item
+            for item in menu_items_with_stock_count
+            if item["stock_balance"] == "QSR"
+            or item["stock_balance"] is None
+            or item["stock_balance"] > 0
         ]
     else:
         filtered_menu_items = menu_items_with_stock_count
@@ -161,6 +181,24 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
     modified = frappe.db.get_value("URY Menu", menu, "modified")
 
     return {"items": filtered_menu_items, "modified_time": modified, "name": menu}
+
+
+def get_qsr_item_groups(pos_profile):
+    """
+    Get all item groups linked to the URY Production Unit assigned to this POS Profile.
+    """
+    production_unit = frappe.db.get_value(
+        "URY Production Unit", {"pos_profile": pos_profile}, "name"
+    )
+
+    if not production_unit:
+        return []
+
+    return frappe.get_all(
+        "URY Production Item Groups",
+        filters={"parent": production_unit},
+        pluck="item_group",
+    )
 
 
 @frappe.whitelist()

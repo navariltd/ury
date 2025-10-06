@@ -11,7 +11,7 @@ export interface MenuItem {
   recommended?: boolean;
   description?: string;
   special_dish?: 1 | 0;
-  stock_balance?: number | null;
+  stock_balance?: number | string | null;
 }
 
 export interface GetMenuResponse {

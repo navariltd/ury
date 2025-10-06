@@ -8,7 +8,7 @@ interface MenuCardProps {
   item_image: string | null;
   course?: string;
   item: string;
-  stock_balance?: number | null;
+  stock_balance?: number | string | null;
   onClick?: () => void;
   disabled?: boolean;
 }
@@ -57,19 +57,21 @@ const MenuCard: FC<MenuCardProps> = ({
           </div>
         )}
 
-        {typeof stock_balance === "number" && (
+        {(typeof stock_balance === "number" || stock_balance === "QSR") && (
           <div
             className={cn(
               "absolute top-1 right-1 px-2 py-0.5 rounded text-[10px] font-semibold shadow-sm",
-              stock_balance > 5 && "bg-green-500 text-white",
-              stock_balance <= 5 &&
+              stock_balance === "QSR" && "bg-orange-500 text-white",
+              typeof stock_balance === "number" &&
                 stock_balance > 0 &&
-                "bg-amber-500 text-white",
-              stock_balance === 0 && "bg-red-500 text-white"
+                "bg-green-500 text-white",
+              typeof stock_balance === "number" &&
+                stock_balance === 0 &&
+                "bg-red-500 text-white"
             )}
-            title='Available stock'
+            title={stock_balance === "QSR" ? "QSR Item" : "Available stock"}
           >
-            {stock_balance === 0 ? "Out" : stock_balance}
+            {stock_balance === "QSR" ? "QSR" : stock_balance}
           </div>
         )}
       </div>
