@@ -37,26 +37,26 @@ def getTable(room):
 @frappe.whitelist()
 def getRestaurantMenu(pos_profile, room=None, order_type=None):
     """
-    Retrieves the restaurant menu based on the provided POS profile, room, and order type.
+    Retrieves the restaurant menu items based on the provided POS profile, room, and order type.
 
-    This function determines the appropriate menu to display for a user based on their role,
-    the POS profile, the room (if specified), and the order type (if specified). It fetches
-    the menu items, including their details and images, and returns them along with the menu's
-    last modified time and name.
+    This function determines the appropriate menu for a restaurant by considering the user's role,
+    the POS profile, the selected room, and the order type. It fetches menu items, checks their
+    availability (including stock levels and QSR item groups), and filters out unavailable items
+    if specified in the POS profile settings.
 
     Args:
-        pos_profile (str): The name of the POS Profile document.
-        room (str, optional): The room identifier to filter the menu by room. Defaults to None.
-        order_type (str, optional): The order type to filter the menu by order type. Defaults to None.
+        pos_profile (str): The name of the POS Profile to use for menu selection.
+        room (str, optional): The room identifier to fetch a room-specific menu. Defaults to None.
+        order_type (str, optional): The order type (e.g., dine-in, takeaway) to fetch an order-type-specific menu. Defaults to None.
 
     Returns:
         dict: A dictionary containing:
-            - "items": List of menu items with details and images.
+            - "items": A list of menu items with their details and stock availability.
             - "modified_time": The last modified timestamp of the menu.
             - "name": The name of the selected menu.
 
     Raises:
-        frappe.exceptions.ValidationError: If no active menu is set for the restaurant.
+        frappe.ValidationError: If no active menu is set for the restaurant.
     """
     menu_items = []
     user_role = frappe.get_roles()
