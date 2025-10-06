@@ -144,11 +144,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             stock_balance = "QSR"
         else:
             # Check stock only if item does not have a BOM
-            stock_balance = (
-                get_stock_availability(item.item_code, pos_profile_doc.warehouse)[0]
-                if not item.default_bom
-                else None
-            )
+            stock_balance = get_stock_availability(item.item_code, pos_profile_doc.warehouse)[0]
 
         menu_items_with_stock_count.append(
             {
