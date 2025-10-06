@@ -37,7 +37,7 @@ export interface MenuItem extends Omit<APIMenuItem, 'rate' | 'item_image'> {
   selectedAddons?: Array<{ id: string; name: string; price: number }>;
   uniqueId?: string;
   tax_rate?: number;
-  stock_balance?: number;
+  stock_balance?: number | string | null;
 }
 
 export interface Customer {

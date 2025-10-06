@@ -130,15 +130,13 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
         )
         .where(UMI.parent == menu)
         .where(UMI.disabled == 0)
+        .where(IT.disabled == 0)
     )
 
     menu_items = menu_items_query.run(as_dict=True)
 
     menu_items_with_stock_count = []
     for item in menu_items:
-        if item.disabled:
-            continue
-
         # Check if item belongs to QSR item groups
         if item.item_group in qsr_item_groups:
             stock_balance = "QSR"

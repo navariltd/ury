@@ -58,7 +58,7 @@ const MenuCard: FC<MenuCardProps> = ({
         )}
 
         {(typeof stock_balance === "number" || stock_balance === "QSR") && (
-          <div
+            <div
             className={cn(
               "absolute top-1 right-1 px-2 py-0.5 rounded text-[10px] font-semibold shadow-sm",
               stock_balance === "QSR" && "bg-orange-500 text-white",
@@ -69,7 +69,6 @@ const MenuCard: FC<MenuCardProps> = ({
                 stock_balance === 0 &&
                 "bg-red-500 text-white"
             )}
-            title={stock_balance === "QSR" ? "QSR Item" : "Available stock"}
           >
             {stock_balance === "QSR" ? "QSR" : stock_balance}
           </div>
