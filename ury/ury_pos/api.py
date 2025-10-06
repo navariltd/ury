@@ -4,12 +4,13 @@ from datetime import date, datetime, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import flt, get_datetime
+from datetime import timedelta
+from frappe.query_builder import DocType
+from erpnext.accounts.doctype.pos_invoice.pos_invoice import get_stock_availability
 
-from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
-    make_closing_entry_from_opening,
-    get_pos_invoices
-)
+
+UMI = DocType("URY Menu Item")
+IT = DocType("Item")
 
 
 @frappe.whitelist()
@@ -35,15 +36,34 @@ def getTable(room):
 
 @frappe.whitelist()
 def getRestaurantMenu(pos_profile, room=None, order_type=None):
+    """
+    Retrieves the restaurant menu items based on the provided POS profile, room, and order type.
+
+    This function determines the appropriate menu for a restaurant by considering the user's role,
+    the POS profile, the selected room, and the order type. It fetches menu items, checks their
+    availability (including stock levels and QSR item groups), and filters out unavailable items
+    if specified in the POS profile settings.
+
+    Args:
+        pos_profile (str): The name of the POS Profile to use for menu selection.
+        room (str, optional): The room identifier to fetch a room-specific menu. Defaults to None.
+        order_type (str, optional): The order type (e.g., dine-in, takeaway) to fetch an order-type-specific menu. Defaults to None.
+
+    Returns:
+        dict: A dictionary containing:
+            - "items": A list of menu items with their details and stock availability.
+            - "modified_time": The last modified timestamp of the menu.
+            - "name": The name of the selected menu.
+
+    Raises:
+        frappe.ValidationError: If no active menu is set for the restaurant.
+    """
     menu_items = []
-    menu_items_with_image = []
-
     user_role = frappe.get_roles()
-
-    pos_profile = frappe.get_doc("POS Profile", pos_profile)
+    pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
 
     cashier = any(
-        role.role in user_role for role in pos_profile.role_allowed_for_billing
+        role.role in user_role for role in pos_profile_doc.role_allowed_for_billing
     )
     branch_name = getBranch()
     restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
@@ -89,29 +109,90 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             _("Please set an active menu for Restaurant {0}").format(restaurant)
         )
 
-    # Get menu items (your existing code)
-    menu_items = frappe.get_all(
-        "URY Menu Item",
-        filters={"parent": menu, "disabled": 0},
-        fields=["item", "item_name", "rate", "special_dish", "disabled", "course"],
-        order_by="item_name asc",
+    # Get QSR item groups for this POS Profile
+    qsr_item_groups = get_qsr_item_groups(pos_profile)
+
+    menu_items_query = (
+        frappe.qb.from_(UMI)
+        .join(IT)
+        .on(UMI.item == IT.name)
+        .select(
+            UMI.item,
+            UMI.item_name,
+            UMI.rate,
+            UMI.special_dish,
+            UMI.disabled,
+            UMI.course,
+            IT.image.as_("item_image"),
+            IT.item_code.as_("item_code"),
+            IT.default_bom,
+            IT.item_group,
+        )
+        .where(UMI.parent == menu)
+        .where(UMI.disabled == 0)
+        .where(IT.disabled == 0)
     )
 
-    menu_items_with_image = [
-        {
-            "item": item.item,
-            "item_name": item.item_name,
-            "rate": item.rate,
-            "special_dish": item.special_dish,
-            "disabled": item.disabled,
-            "item_image": frappe.db.get_value("Item", item.item, "image"),
-            "course": item.course,
-        }
-        for item in menu_items
-    ]
+    menu_items = menu_items_query.run(as_dict=True)
+
+    menu_items_with_stock_count = []
+    for item in menu_items:
+        # Check if item belongs to QSR item groups
+        if item.item_group in qsr_item_groups:
+            stock_balance = "QSR"
+        else:
+            # Check stock only if item does not have a BOM
+            stock_balance = get_stock_availability(item.item_code, pos_profile_doc.warehouse)[0]
+
+        menu_items_with_stock_count.append(
+            {
+                "item": item.item,
+                "item_name": item.item_name,
+                "rate": item.rate,
+                "special_dish": item.special_dish,
+                "disabled": item.disabled,
+                "item_image": item.item_image,
+                "course": item.course,
+                "stock_balance": stock_balance,
+            }
+        )
+
+    filtered_menu_items = []
+
+    # if pos_profile.hide_unavailable_items hide items with zero stock
+    if pos_profile_doc.hide_unavailable_items:
+        # Filter out items with zero stock, but keep QSR items
+        filtered_menu_items = [
+            item
+            for item in menu_items_with_stock_count
+            if item["stock_balance"] == "QSR"
+            or item["stock_balance"] is None
+            or item["stock_balance"] > 0
+        ]
+    else:
+        filtered_menu_items = menu_items_with_stock_count
+
     modified = frappe.db.get_value("URY Menu", menu, "modified")
 
-    return {"items": menu_items_with_image, "modified_time": modified, "name": menu}
+    return {"items": filtered_menu_items, "modified_time": modified, "name": menu}
+
+
+def get_qsr_item_groups(pos_profile):
+    """
+    Get all item groups linked to the URY Production Unit assigned to this POS Profile.
+    """
+    production_unit = frappe.db.get_value(
+        "URY Production Unit", {"pos_profile": pos_profile}, "name"
+    )
+
+    if not production_unit:
+        return []
+
+    return frappe.get_all(
+        "URY Production Item Groups",
+        filters={"parent": production_unit},
+        pluck="item_group",
+    )
 
 
 @frappe.whitelist()
@@ -639,19 +720,18 @@ def posOpening():
     pos_opening_list = frappe.get_all(
         "POS Opening Entry",
         fields=["name", "docstatus", "status", "posting_date"],
-        filters={"branch": branchName, "status": "Open", "docstatus": 1, "user": frappe.session.user},
+        filters={
+            "branch": branchName,
+            "status": "Open",
+            "docstatus": 1,
+            "user": frappe.session.user,
+        },
     )
     print(pos_opening_list)
     if not pos_opening_list:
-        return {
-            "status": "not_opened",
-            "opening_entry": None
-        }
-    
-    return {
-        "status": "open",
-        "opening_entry": pos_opening_list[0].name
-    }
+        return {"status": "not_opened", "opening_entry": None}
+
+    return {"status": "open", "opening_entry": pos_opening_list[0].name}
 
 
 @frappe.whitelist()
@@ -785,10 +865,11 @@ def getAllOrders(limit, limit_start):
 
     return {"data": updatedlist, "next": next}
 
+
 @frappe.whitelist()
 def create_opening_voucher(company: str, pos_profile: str, balance_details: list):
     try:
-        
+
         new_pos_opening = frappe.get_doc(
             {
                 "doctype": "POS Opening Entry",
@@ -806,6 +887,7 @@ def create_opening_voucher(company: str, pos_profile: str, balance_details: list
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "POS Opening Creation Failed")
         return {"status": "error", "message": str(e)}
+
 
 @frappe.whitelist()
 def get_closing_preview(pos_opening_entry: str):
@@ -854,11 +936,13 @@ def submit_pos_closing(pos_opening_entry: str, closing_amounts: list = None):
 
         # inject actual amounts
         if closing_amounts:
-            closing_map = {p["mode_of_payment"]: p["closing_amount"] for p in closing_amounts}
+            closing_map = {
+                p["mode_of_payment"]: p["closing_amount"] for p in closing_amounts
+            }
             for row in closing_entry.payment_reconciliation:
                 row.closing_amount = closing_map.get(row.mode_of_payment, 0)
                 row.difference = row.closing_amount - row.expected_amount
-        
+
         closing_entry.insert(ignore_permissions=True)
         closing_entry.submit()
         return {"status": "success", "closing_entry": closing_entry.name}
