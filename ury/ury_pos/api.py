@@ -8,6 +8,7 @@ from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
 
 import frappe
 from frappe import _
+from frappe.utils import flt
 from datetime import timedelta
 from frappe.query_builder import DocType
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import get_stock_availability
