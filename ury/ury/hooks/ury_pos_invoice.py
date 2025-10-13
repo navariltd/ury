@@ -435,7 +435,7 @@ class URYPOSInvoice(POSInvoice):
 
 		work_orders = frappe.get_all(
 			"Work Order",
-			filters={"kot_invoice": self.name},
+			filters={"pos_invoice": self.name},
 			fields=["name", "status", "docstatus", "qty", "produced_qty"]
 		)
 
