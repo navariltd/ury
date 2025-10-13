@@ -34,7 +34,8 @@ class URYPOSInvoice(POSInvoice):
 		self.calculate_taxes_and_totals()
 
 	def before_submit(self):
-		self.auto_complete_work_orders()
+		if self.get_auto_manufacture_setting():
+			self.auto_complete_work_orders()
 		self.calculate_and_set_times()
 		self.validate_invoice_print()
 		self.ro_reload_submit()
@@ -53,6 +54,7 @@ class URYPOSInvoice(POSInvoice):
 			return
 
 		# Fetch QSR item groups for this POS Profile
+		auto_manufacture_on_sale = self.get_auto_manufacture_setting()
 		qsr_item_groups = self.get_qsr_item_groups(self.pos_profile)
 
 		missing_materials = []
@@ -65,90 +67,110 @@ class URYPOSInvoice(POSInvoice):
 
 			# If item belongs to QSR groups → validate raw materials
 			if item_group in qsr_item_groups:
-				# Find default BOM for the item
-				if self.docstatus.is_draft() and not self.skip_raw_material_validation:
-					bom = frappe.db.get_value(
-						"BOM", {"item": d.item_code, "is_default": 1}, "name"
-					)
-					if not bom:
-						frappe.throw(
-							_("Row #{0}: No default BOM found for QSR Item {1}").format(
-								d.idx, d.item_code
-							)
-						)
+				if auto_manufacture_on_sale:
+					self.validate_qsr_raw_materials(d, qsr_item_groups, missing_materials)
+				else:
+					self.validate_finished_item_stock(d)
+			else:
+				self.validate_normal_item_stock(d)
 
-					# Get raw materials from BOM
-					leaf_items = self.get_all_leaf_bom_items(bom, self.company, qsr_item_groups)
+			self.raise_if_missing_materials(missing_materials)
 
-					source_warehouse = frappe.db.get_value(
-						"POS Profile", self.pos_profile, "warehouse"
-					)
-
-					for rm_code, rm in leaf_items.items():
-						required_qty = flt(rm["qty"]) * flt(d.stock_qty)
-						available_qty = get_stock_balance(
-							rm_code, source_warehouse, self.posting_date
-						)
-
-						if flt(available_qty) < required_qty:
-							missing_materials.append(
-								{
-									"row": d.idx,
-									"qsr_item": d.item_code,
-									"qsr_item_name": d.item_name,
-									"raw_material": rm_code,
-									"raw_material_name": rm["item_name"],
-									"required": required_qty,
-									"available": available_qty,
-								}
-							)
-
-				continue  # Skip normal stock check for QSR items
-
-			# Normal stock validation for non-QSR items
-			if is_negative_stock_allowed(item_code=d.item_code):
-				continue
-
-			available_stock, is_stock_item = get_stock_availability(
-				d.item_code, d.warehouse
-			)
-			item_code, warehouse, item_name = d.item_code, d.warehouse, d.item_name
-
-			if is_stock_item and flt(available_stock) <= 0:
-				frappe.throw(
-					_("Row #{}: Item '{}' is out of stock in warehouse '{}'.").format(
-						d.idx, item_name, warehouse
-					),
-					title=_("Item Unavailable"),
-				)
-			elif is_stock_item and flt(available_stock) < flt(d.stock_qty):
-				frappe.throw(
-					_(
-						"Row #{}: Insufficient stock for '{}'. Required: {}, Available: {} in warehouse '{}'."
-					).format(d.idx, item_name, d.stock_qty, available_stock, warehouse),
-					title=_("Insufficient Stock"),
-				)
-
-		# After checking all items → show one combined error if any raw materials are missing
-		if missing_materials:
-			messages = ["Cannot process order - insufficient raw materials:"]
-			for m in missing_materials:
-				messages.append(
-					_("• {} requires {} {} (only {} available)").format(
-						m["qsr_item_name"],
-						m["required"],
-						m["raw_material_name"],
-						m["available"],
-					)
-				)
-			frappe.throw("\n".join(messages), title=_("Insufficient Raw Materials"))
-		else:
 			if (
 				self.docstatus.is_draft()
 				and qsr_item_groups
 				and not self.skip_raw_material_validation
 			):
 				self.skip_raw_material_validation = 1
+
+	def get_auto_manufacture_setting(self):
+		"""Fetch Auto Manufacture on Sale flag from POS Profile"""
+		return frappe.db.get_value("POS Profile", self.pos_profile, "auto_manufacture_on_sale")
+	
+	def validate_qsr_raw_materials(self, d, qsr_item_groups, missing_materials):
+		"""Validate that required raw materials for a QSR item are available."""
+		if self.docstatus.is_draft() and not self.skip_raw_material_validation:
+			bom = frappe.db.get_value("BOM", {"item": d.item_code, "is_default": 1}, "name")
+			if not bom:
+				frappe.throw(
+					_("Row #{0}: No default BOM found for QSR Item {1}").format(
+						d.idx, d.item_code
+					)
+				)
+
+			# Get raw materials from BOM
+			leaf_items = self.get_all_leaf_bom_items(bom, self.company, qsr_item_groups)
+			source_warehouse = frappe.db.get_value(
+				"POS Profile", self.pos_profile, "warehouse"
+			)
+
+			for rm_code, rm in leaf_items.items():
+				required_qty = flt(rm["qty"]) * flt(d.stock_qty)
+				available_qty = get_stock_balance(
+					rm_code, source_warehouse, self.posting_date
+				)
+
+				if flt(available_qty) < required_qty:
+					missing_materials.append(
+						{
+							"row": d.idx,
+							"qsr_item": d.item_code,
+							"qsr_item_name": d.item_name,
+							"raw_material": rm_code,
+							"raw_material_name": rm["item_name"],
+							"required": required_qty,
+							"available": available_qty,
+						}
+					)
+
+	def validate_finished_item_stock(self, d):
+		"""Validate available stock of a finished QSR item."""
+		available_stock, is_stock_item = get_stock_availability(d.item_code, d.warehouse)
+		if is_stock_item and flt(available_stock) < flt(d.stock_qty):
+			frappe.throw(
+				_("Row #{}: Insufficient stock for '{}'. Required: {}, Available: {} in warehouse '{}'.")
+				.format(d.idx, d.item_name, d.stock_qty, available_stock, d.warehouse),
+				title=_("Insufficient Stock"),
+			)
+
+	def validate_normal_item_stock(self, d):
+		"""Validate normal stock items not part of QSR groups."""
+		if is_negative_stock_allowed(item_code=d.item_code):
+			return
+
+		available_stock, is_stock_item = get_stock_availability(d.item_code, d.warehouse)
+
+		if is_stock_item and flt(available_stock) <= 0:
+			frappe.throw(
+				_("Row #{}: Item '{}' is out of stock in warehouse '{}'.").format(
+					d.idx, d.item_name, d.warehouse
+				),
+				title=_("Item Unavailable"),
+			)
+		elif is_stock_item and flt(available_stock) < flt(d.stock_qty):
+			frappe.throw(
+				_(
+					"Row #{}: Insufficient stock for '{}'. Required: {}, Available: {} in warehouse '{}'."
+				).format(d.idx, d.item_name, d.stock_qty, available_stock, d.warehouse),
+				title=_("Insufficient Stock"),
+			)
+
+	def raise_if_missing_materials(self, missing_materials):
+		"""Raise a single combined error message for missing raw materials."""
+		if not missing_materials:
+			return
+
+		messages = ["Cannot process order - insufficient raw materials:"]
+		for m in missing_materials:
+			messages.append(
+				_("• {} requires {} {} (only {} available)").format(
+					m["qsr_item_name"],
+					m["required"],
+					m["raw_material_name"],
+					m["available"],
+				)
+			)
+		frappe.throw("\n".join(messages), title=_("Insufficient Raw Materials"))
 
 	@staticmethod
 	def get_all_leaf_bom_items(bom, company, qsr_item_groups):
