@@ -200,11 +200,45 @@ export default function Orders() {
         selectedOrder.name
       )}&format=${encodeURIComponent(printFormat)}&no_letterhead=0&_lang=en`;
 
+      // Fetch printable HTML
+      const response = await fetch(printUrl, {
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch print content");
+      }
+
+      const html = await response.text();
+
+      // Create a hidden iframe for printing
+      const printFrame = document.createElement("iframe");
+      printFrame.style.position = "fixed";
+      printFrame.style.right = "0";
+      printFrame.style.bottom = "0";
+      printFrame.style.width = "0";
+      printFrame.style.height = "0";
+      printFrame.style.border = "0";
+      document.body.appendChild(printFrame);
+
+      const frameDoc = printFrame.contentWindow?.document;
+      frameDoc?.open();
+      frameDoc?.write(html);
+      frameDoc?.close();
+
+      // Wait for iframe content to fully load before printing
+      printFrame.onload = () => {
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+
+        setTimeout(() => document.body.removeChild(printFrame), 2000);
+      }
+
       // const printUrl = `/app/print/${encodeURIComponent("POS Invoice")}/${encodeURIComponent(
       //     selectedOrder.name
       //   )}?format=${encodeURIComponent(printFormat)}&no_letterhead=0`;
 
-      window.open(printUrl, "_blank");
+      // window.open(printUrl, "_blank");
 
       // Update backend to mark invoice as printed
       await call.post("frappe.client.set_value", {
