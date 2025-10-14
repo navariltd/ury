@@ -29,7 +29,7 @@ export const showToast = {
   error: (message: string) => {
     toast.error(message, {
       position: 'top-right',
-      autoClose: 10000,
+      autoClose: 5000,
       hideProgressBar: false,
       closeOnClick: true,
       pauseOnHover: true,
@@ -60,7 +60,7 @@ export const ToastProvider = () => {
   return (
     <ToastContainer
       position="top-right"
-      autoClose={100000}
+      autoClose={50000}
       hideProgressBar={false}
       newestOnTop
       closeOnClick
