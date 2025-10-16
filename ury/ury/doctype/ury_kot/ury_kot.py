@@ -132,7 +132,7 @@ class URYKOT(Document):
     def get_auto_manufacture_setting(self):
         """Fetch Auto Manufacture on Sale flag from POS Profile"""
         pos_profile = frappe.db.get_value(
-            "URY Production Unit", self.name, "pos_profile"
+            "URY Production Unit", self.production, "pos_profile"
         )
         return frappe.db.get_value(
             "POS Profile", pos_profile, "auto_manufacture_on_sale"
