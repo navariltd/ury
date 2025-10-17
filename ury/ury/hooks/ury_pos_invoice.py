@@ -7,7 +7,7 @@ from erpnext.accounts.doctype.pos_invoice.pos_invoice import (
 )
 from erpnext.manufacturing.doctype.bom.bom import get_bom_items_as_dict
 from erpnext.manufacturing.doctype.work_order.work_order import make_stock_entry
-from erpnext.stock.stock_ledger import NegativeStockError, is_negative_stock_allowed
+from erpnext.stock.stock_ledger import is_negative_stock_allowed
 from erpnext.stock.utils import get_stock_balance
 from frappe import _
 from frappe.model.meta import get_field_precision
@@ -463,13 +463,18 @@ class URYPOSInvoice(POSInvoice):
         """
         Run before POS Invoice is submitted.
         - Ensures all linked Work Orders are submitted and completed.
-        - Creates Manufacture stock entries.
-        - Marks all related URY KOTs as Served (inline KOT update).
+        - For each WO:
+            - If SE exists (draft) → submit it.
+            - If SE exists (submitted) → skip.
+            - Else → create and submit a new one.
+        - Marks all related URY KOTs as Served.
+        - Collects results and throws a single clear error summary if any failed.
         """
 
-        auto_manufacture_on_sale = self.get_auto_manufacture_setting()
-        if not auto_manufacture_on_sale:
+        if not self.get_auto_manufacture_setting():
             return
+
+        failed, skipped, succeeded = [], [], []
 
         work_orders = frappe.get_all(
             "Work Order",
@@ -487,43 +492,94 @@ class URYPOSInvoice(POSInvoice):
             pending_qty = (work_order.qty or 0) - (work_order.produced_qty or 0)
 
             if pending_qty <= 0 or work_order.status == "Completed":
+                skipped.append(f"{wo.name} (already completed or no pending qty)")
                 continue
 
-            # 2. Manufacture Stock Entry
             try:
-                stock_entry_data = make_stock_entry(
-                    work_order.name, "Manufacture", qty=pending_qty
-                )
-                stock_entry_doc = frappe.get_doc(
-                    stock_entry_data
-                )  # Convert dict to Doc
+                frappe.db.savepoint("before_auto_manufacture")
 
-                # Align stock entry posting date/time with invoice
-                invoice_dt = get_datetime(f"{self.posting_date} {self.posting_time}")
-                if invoice_dt.time().strftime("%H:%M:%S") == "00:00:00":
-                    adjusted_dt = invoice_dt
+                existing_entries = frappe.get_all(
+                    "Stock Entry",
+                    filters={"work_order": work_order.name},
+                    fields=["name", "docstatus"],
+                    order_by="creation desc",
+                    limit_page_length=1,
+                )
+
+                se_doc = None
+
+                # Prefer a draft SE if it exists
+                draft_entry = next(
+                    (se for se in existing_entries if se.docstatus == 0), None
+                )
+                if draft_entry:
+                    se_doc = frappe.get_doc("Stock Entry", draft_entry.name)
+                    se_doc.submit()
+                    succeeded.append(
+                        f"{work_order.name} (used existing draft SE {se_doc.name})"
+                    )
+
+                # Otherwise, skip if already submitted
+                elif existing_entries and existing_entries[0].docstatus == 1:
+                    skipped.append(
+                        f"{work_order.name} (SE {existing_entries[0].name} already submitted)"
+                    )
+
                 else:
-                    adjusted_dt = invoice_dt - timedelta(seconds=1)
+                    # 2. Manufacture Stock Entry
+                    stock_entry_data = make_stock_entry(
+                        work_order.name, "Manufacture", qty=pending_qty
+                    )
 
-                invoice_dt = invoice_dt + timedelta(seconds=3)
-                self.posting_time = invoice_dt.time().strftime("%H:%M:%S")
+                    if not stock_entry_data:
+                        failed.append(
+                            (work_order.name, "make_stock_entry returned None")
+                        )
+                        frappe.db.rollback(save_point="before_auto_manufacture")
+                        continue
 
-                stock_entry_doc.posting_date = adjusted_dt.date()
-                stock_entry_doc.posting_time = adjusted_dt.strftime("%H:%M:%S")
+                    stock_entry_doc = frappe.get_doc(
+                        stock_entry_data
+                    )  # Convert dict to Doc
 
-                stock_entry_doc.insert()
-                stock_entry_doc.submit()
-            except NegativeStockError as e:
-                frappe.throw(
-                    f"Cannot auto-complete Work Order {work_order.name}: insufficient stock.\n{e}"
-                )
+                    # Align stock entry posting date/time with invoice
+                    invoice_dt = get_datetime(
+                        f"{self.posting_date} {self.posting_time}"
+                    )
+                    if invoice_dt.time().strftime("%H:%M:%S") == "00:00:00":
+                        adjusted_dt = invoice_dt
+                    else:
+                        adjusted_dt = invoice_dt - timedelta(seconds=1)
 
-            if work_order.status != "Completed":
-                frappe.db.set_value(
-                    "Work Order", work_order.name, "status", "Completed"
-                )
-                frappe.db.set_value(
-                    "Work Order", work_order.name, "actual_end_date", now()
+                    invoice_dt = invoice_dt + timedelta(seconds=3)
+                    self.posting_time = invoice_dt.time().strftime("%H:%M:%S")
+
+                    stock_entry_doc.posting_date = adjusted_dt.date()
+                    stock_entry_doc.posting_time = adjusted_dt.strftime("%H:%M:%S")
+
+                    stock_entry_doc.insert()
+                    stock_entry_doc.submit()
+                    succeeded.append(
+                        f"{work_order.name} (created new SE {stock_entry_doc.name})"
+                    )
+
+                if work_order.status != "Completed":
+                    frappe.db.set_value(
+                        "Work Order", work_order.name, "status", "Completed"
+                    )
+                    frappe.db.set_value(
+                        "Work Order", work_order.name, "actual_end_date", now()
+                    )
+
+            except frappe.ValidationError as e:
+                frappe.db.rollback(save_point="before_auto_manufacture")
+                frappe.clear_messages()
+                failed.append(f"{work_order.name}: insufficient stock → {e}")
+
+            except Exception:
+                frappe.db.rollback(save_point="before_auto_manufacture")
+                failed.append(
+                    f"{work_order.name}: unexpected error → {frappe.get_traceback()}"
                 )
 
         def _mark_kot_served(kot_name):
@@ -550,3 +606,10 @@ class URYPOSInvoice(POSInvoice):
             _mark_kot_served(kot["name"])
 
         frappe.db.commit()
+
+        if failed:
+            frappe.clear_messages()
+            frappe.throw(
+                "Some Work Orders could not be completed:\n\n" + "\n".join(failed),
+                title="Auto Manufacture Errors",
+            )
