@@ -51,7 +51,6 @@ class URYPOSInvoice(POSInvoice):
 
         # Fetch QSR item groups for this POS Profile
         auto_manufacture_on_sale = self.get_auto_manufacture_setting()
-        print(f"Auto Manufacture on Sale: {auto_manufacture_on_sale}")
         qsr_item_groups = self.get_qsr_item_groups(self.pos_profile)
 
         missing_materials = []
@@ -75,12 +74,12 @@ class URYPOSInvoice(POSInvoice):
 
             self.raise_if_missing_materials(missing_materials)
 
-            if (
-                self.docstatus.is_draft()
-                and qsr_item_groups
-                and not self.skip_raw_material_validation
-            ):
-                self.skip_raw_material_validation = 1
+        if (
+            self.docstatus.is_draft()
+            and qsr_item_groups
+            and not self.skip_raw_material_validation
+        ):
+            self.skip_raw_material_validation = 1
 
     def get_auto_manufacture_setting(self):
         """Fetch Auto Manufacture on Sale flag from POS Profile"""
@@ -97,7 +96,7 @@ class URYPOSInvoice(POSInvoice):
             if not bom:
                 frappe.throw(
                     _("Row #{0}: No default BOM found for QSR Item {1}").format(
-                        d.idx, d.item_code
+                        d.idx, d.item_name
                     )
                 )
 
