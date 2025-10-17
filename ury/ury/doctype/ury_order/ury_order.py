@@ -2,15 +2,14 @@
 # For license information, please see license.txt
 
 import json
+
 import frappe
+from erpnext.controllers.queries import item_query
 from frappe import _
 from frappe.model.document import Document
-from erpnext.controllers.queries import item_query
-from ury.ury_pos.api import getBranch, getBranchRoom
-from ury.ury.api.ury_kot_generate import kot_execute
-from ury.ury.api.ury_kot_generate import process_items_for_cancel_kot
 
-from frappe import cache
+from ury.ury.api.ury_kot_generate import kot_execute, process_items_for_cancel_kot
+from ury.ury_pos.api import getBranch, getBranchRoom
 
 
 class URYOrder(Document):
@@ -26,20 +25,20 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             invoice_name = frappe.get_value(
                 "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
-            
+
         else:
             if invoiceNo:
                 invoice_name = frappe.get_value(
                     "POS Invoice",
                     dict(restaurant_table=table, docstatus=0, name=invoiceNo),
                 )
-               
+
             else:
                 invoice_name = frappe.get_value(
                     "POS Invoice",
                     dict(restaurant_table=table, docstatus=0, invoice_printed=0),
                 )
-                
+
         # invoice_name = frappe.get_value("POS Invoice", dict(restaurant_table=table, docstatus=0, invoice_printed=0))
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
@@ -62,7 +61,7 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
             if is_take_away == 1:
                 invoice.order_type = "Take Away"
             else:
-                invoice.order_type= "Dine In"
+                invoice.order_type = "Dine In"
 
         invoice.taxes_and_charges = frappe.db.get_value(
             "URY Restaurant", restaurant, "default_tax_template"
@@ -73,39 +72,40 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         )
 
     else:
-
         if is_payment == "Payments":
             invoice_name = frappe.get_value(
                 "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
-            
+
         else:
             invoice_name = frappe.get_value(
                 "POS Invoice", dict(docstatus=0, name=invoiceNo)
             )
-            
+
         if invoice_name:
             invoice = frappe.get_doc("POS Invoice", invoice_name)
-            
 
         else:
             invoice = frappe.new_doc("POS Invoice")
             invoice.is_pos = 1
             invoice.update_stock = 1
-        
+
         branch = getBranch()
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
-   
-        menu=get_menu_name(order_type)
- 
-        if (order_type == "Aggregators" and frappe.db.get_value("Branch", branch, "custom_no_taxes") == 0) or order_type != "Aggregators":
-            invoice.taxes_and_charges = frappe.db.get_value("URY Restaurant", restaurant, "default_tax_template")
-        
+
+        menu = get_menu_name(order_type)
+
+        if (
+            order_type == "Aggregators"
+            and frappe.db.get_value("Branch", branch, "custom_no_taxes") == 0
+        ) or order_type != "Aggregators":
+            invoice.taxes_and_charges = frappe.db.get_value(
+                "URY Restaurant", restaurant, "default_tax_template"
+            )
+
         invoice.selling_price_list = frappe.db.get_value(
             "Price List", dict(restaurant_menu=menu, enabled=1)
         )
-        
-        
 
     return invoice
 
@@ -127,12 +127,11 @@ def sync_order(
     comments=None,
     order_type=None,
     aggregator_id=None,
-    room=None
+    room=None,
 ):
-    
     user_role = frappe.get_roles()
     posprofile = frappe.get_doc("POS Profile", pos_profile)
-    
+
     billing_user = any(
         role.role in user_role for role in posprofile.role_allowed_for_billing
     )
@@ -150,7 +149,7 @@ def sync_order(
         )
         return {"status": "Failure"}
 
-    invoice = get_order_invoice(table, invoice,order_type)
+    invoice = get_order_invoice(table, invoice, order_type)
 
     if last_invoice and last_modified_time:
         lastModifiedTime = invoice.modified
@@ -211,14 +210,20 @@ def sync_order(
     invoice.cashier = cashier
     invoice.waiter = waiter
     invoice.custom_aggregator_id = aggregator_id
-    invoice.custom_restaurant_room =room
+    invoice.custom_restaurant_room = room
     invoice.restaurant_table = table
-    
+
     if order_type == "Aggregators":
-        price_list = frappe.db.get_value("Aggregator Settings",{"customer": customer, "parent": invoice.branch, "parenttype": "Branch"},"price_list",)
-        
+        price_list = frappe.db.get_value(
+            "Aggregator Settings",
+            {"customer": customer, "parent": invoice.branch, "parenttype": "Branch"},
+            "price_list",
+        )
+
         if not price_list:
-            frappe.throw(f"Price list for customer {customer} in branch {invoice.branch} not found in Aggregator Settings.")
+            frappe.throw(
+                f"Price list for customer {customer} in branch {invoice.branch} not found in Aggregator Settings."
+            )
     else:
         price_list = invoice.selling_price_list
 
@@ -239,7 +244,6 @@ def sync_order(
             "comments": "",
         }
         past_item.append(previous_item)
-        
 
     # Conditional checking for 'items' type:
     # - 'ury': JSON passed, hence using isinstance
@@ -247,14 +251,15 @@ def sync_order(
     if isinstance(items, str):
         items = json.loads(items)
     invoice.items = []
-    
+
     menu = frappe.db.get_value("URY Menu", {"branch": invoice.branch}, "name")
     warehouse = frappe.db.get_value("POS Profile", pos_profile, "warehouse")
-   
+
     for d in items:
-        
-        course = frappe.db.get_value("URY Menu Item", {"item": d.get("item"),"parent":menu}, "course")
-        
+        course = frappe.db.get_value(
+            "URY Menu Item", {"item": d.get("item"), "parent": menu}, "course"
+        )
+
         item_prices = frappe.db.get_list(
             "Item Price",
             filters={"item_code": d.get("item"), "price_list": price_list},
@@ -262,7 +267,11 @@ def sync_order(
         )
 
         if not item_prices:
-            frappe.throw(_("No item price found for Item: {0} in Price List: {1}. Please check the price list settings.").format(item.item_code, price_list))
+            frappe.throw(
+                _(
+                    "No item price found for Item: {0} in Price List: {1}. Please check the price list settings."
+                ).format(item.item_code, price_list)
+            )
 
         else:
             invoice.append(
@@ -273,12 +282,12 @@ def sync_order(
                     qty=d.get("qty"),
                     **({"custom_course": course} if course else {}),
                     comment=d.get("comment"),
-                    rate = item_prices[0].price_list_rate,
-                    price_list_rate = item_prices[0].price_list_rate,
-                    base_price_list_rate = item_prices[0].price_list_rate,
-                    cost_center = frappe.db.get_value(
+                    rate=item_prices[0].price_list_rate,
+                    price_list_rate=item_prices[0].price_list_rate,
+                    base_price_list_rate=item_prices[0].price_list_rate,
+                    cost_center=frappe.db.get_value(
                         "POS Profile", pos_profile, "cost_center"
-                        ),
+                    ),
                     warehouse=warehouse,
                 ),
             )
@@ -286,15 +295,14 @@ def sync_order(
     try:
         invoice.save()
     except Exception as e:
-        frappe.throw(f"Error while updating order: {e}")   
-
+        frappe.throw(f"Error while updating order: {e}")
 
     try:
         kot_execute(invoice.name, customer, table, items, past_item, comments)
 
     except Exception as e:
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without affect the code execution.
-        error_msg = f"KOT Creation Failes {str(e)}"            
+        error_msg = f"KOT Creation Failes {str(e)}"
         frappe.log_error(error_msg, "KOT Error")
 
     # table status
@@ -358,6 +366,7 @@ def get_restaurant_and_menu_name(table):
 
     return branch, menu, restaurant
 
+
 @frappe.whitelist()
 def get_menu_name(order_type):
     branch = getBranch()
@@ -367,25 +376,22 @@ def get_menu_name(order_type):
         "name",
     )
     order_type_wise_menu = frappe.db.get_value(
-            "URY Restaurant", restaurant, "order_type_wise_menu"
-        )
-    
+        "URY Restaurant", restaurant, "order_type_wise_menu"
+    )
+
     if order_type_wise_menu:
         menu = frappe.db.get_value(
-            "Order Type Menu",
-            {"parent": restaurant, "order_type": order_type},
-            "menu"
+            "Order Type Menu", {"parent": restaurant, "order_type": order_type}, "menu"
         )
         if not menu:
             menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
     else:
-        menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")   
-    return menu  
-    
+        menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
+    return menu
+
 
 @frappe.whitelist()
 def pos_opening_check():
-    
     user = frappe.session.user
     # Handle the administrator case differently
     if user == "Administrator":
@@ -394,23 +400,26 @@ def pos_opening_check():
             "cashier": None,
             "pos_profile": None,
         }
-    
+
     details = getBranchRoom()
-    room = details[0].get('name')    # 'Beach'
-    branch = details[0].get('branch') # 'Beach'
-    
-    pos_opening_list = frappe.db.sql("""
-        SELECT DISTINCT `tabPOS Opening Entry`.name 
+    room = details[0].get("name")  # 'Beach'
+    branch = details[0].get("branch")  # 'Beach'
+
+    pos_opening_list = frappe.db.sql(
+        """
+        SELECT DISTINCT `tabPOS Opening Entry`.name
         FROM `tabPOS Opening Entry`
-        INNER JOIN `tabMultiple Rooms` 
+        INNER JOIN `tabMultiple Rooms`
         ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
         WHERE `tabPOS Opening Entry`.branch = %s
         AND `tabPOS Opening Entry`.status = 'Open'
         AND `tabPOS Opening Entry`.docstatus = 1
         AND `tabMultiple Rooms`.room = %s
-    """, (branch, room), as_dict=True)
-    
-    
+    """,
+        (branch, room),
+        as_dict=True,
+    )
+
     result = {
         "opening_exists": len(pos_opening_list) > 0,
         "cashier": None,
@@ -424,7 +433,7 @@ def pos_opening_check():
             opening_entry.user
         )  # Fetch values from POS Profile linked to POS Opening Entry
         result["pos_profile"] = opening_entry.pos_profile
-        
+
     return result
 
 
@@ -455,11 +464,9 @@ def table_transfer(table, newTable, invoice):
         pos_invoice.save()
 
         try:
-            change_table_in_kot(
-                    pos_invoice.name, new_table.name, pos_invoice.branch
-                )
+            change_table_in_kot(pos_invoice.name, new_table.name, pos_invoice.branch)
 
-        except Exception as e:
+        except Exception:
             # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
             pass
 
@@ -469,22 +476,30 @@ def table_transfer(table, newTable, invoice):
 
 @frappe.whitelist()
 def captain_transfer(currentCaptain, newCaptain, invoice):
-    pos_profile=frappe.get_value("POS Invoice", invoice,"pos_profile")
-    multiple_cashier = frappe.db.get_value("POS Profile",pos_profile,"custom_enable_multiple_cashier")
-    branch=frappe.get_value("POS Invoice", invoice,"branch")
+    pos_profile = frappe.get_value("POS Invoice", invoice, "pos_profile")
+    multiple_cashier = frappe.db.get_value(
+        "POS Profile", pos_profile, "custom_enable_multiple_cashier"
+    )
+    branch = frappe.get_value("POS Invoice", invoice, "branch")
     if multiple_cashier:
-        table=pos_profile=frappe.get_value("POS Invoice", invoice,"restaurant_table")
-        current_room = frappe.get_value("URY Table", table,"restaurant_room")
-        new_captain_room =  frappe.db.sql("""
+        table = pos_profile = frappe.get_value(
+            "POS Invoice", invoice, "restaurant_table"
+        )
+        current_room = frappe.get_value("URY Table", table, "restaurant_room")
+        new_captain_room = frappe.db.sql(
+            """
                 SELECT room
                 FROM `tabURY User`
-                WHERE parent=%s AND user=%s         
-            """,(branch,newCaptain),as_dict=True)
-        room_match = any(room['room'] == current_room for room in new_captain_room)
+                WHERE parent=%s AND user=%s
+            """,
+            (branch, newCaptain),
+            as_dict=True,
+        )
+        room_match = any(room["room"] == current_room for room in new_captain_room)
         if not room_match:
             frappe.throw(_("Captain transfer is not allowed between different rooms"))
         else:
-            current_captain_doc = frappe.get_doc("User", currentCaptain)
+            # current_captain_doc = frappe.get_doc("User", currentCaptain)
             pos_invoice = frappe.get_doc("POS Invoice", invoice)
             new_captain_doc = frappe.get_doc("User", newCaptain)
 
@@ -493,7 +508,7 @@ def captain_transfer(currentCaptain, newCaptain, invoice):
             pos_invoice.save()
 
     else:
-        current_captain_doc = frappe.get_doc("User", currentCaptain)
+        # current_captain_doc = frappe.get_doc("User", currentCaptain)
         pos_invoice = frappe.get_doc("POS Invoice", invoice)
         new_captain_doc = frappe.get_doc("User", newCaptain)
 
@@ -540,24 +555,37 @@ def cancel_order(invoice_id, reason):
     try:
         cancel_kot(invoice_id)
 
-    except Exception as e:
+    except Exception:
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         pass
 
     # Update invoice status
-    frappe.db.sql("""
+    frappe.db.sql(
+        """
         UPDATE `tabPOS Invoice Item`
         SET docstatus = 2
         WHERE parent = %s
-    """, (invoice_id,))
+    """,
+        (invoice_id,),
+    )
 
     frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
     frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
     frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
 
+
 # Method for URY POS
 @frappe.whitelist()
-def make_invoice(customer, payments, cashier, pos_profile, owner, additionalDiscount=None, table=None, invoice=None):
+def make_invoice(
+    customer,
+    payments,
+    cashier,
+    pos_profile,
+    owner,
+    additionalDiscount=None,
+    table=None,
+    invoice=None,
+):
     # Always fetch existing draft invoice
     order_type = frappe.get_value("POS Invoice", invoice, "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
@@ -584,14 +612,17 @@ def make_invoice(customer, payments, cashier, pos_profile, owner, additionalDisc
 
     try:
         invoice.submit()
+    except frappe.ValidationError:
+        raise
     except Exception as e:
+        frappe.clear_messages()
         frappe.throw(f"Error while settling order: {e}")
 
     return invoice.name
 
+
 # Cancel KOT Doc Creation
 def cancel_kot(invoice_id):
-
     pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
     pos_profile_id = pos_invoice.pos_profile
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
