@@ -557,6 +557,7 @@ class URYPOSInvoice(POSInvoice):
                     stock_entry_doc.posting_date = adjusted_dt.date()
                     stock_entry_doc.posting_time = adjusted_dt.strftime("%H:%M:%S")
 
+                    stock_entry_doc.flags.ignore_permissions = True
                     stock_entry_doc.insert()
                     stock_entry_doc.submit()
                     succeeded.append(
