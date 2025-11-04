@@ -642,6 +642,7 @@ export default function Orders() {
           owner={posStore.posProfile?.cashier || ""}
           fetchOrders={fetchOrders}
           clearSelectedOrder={clearSelectedOrder}
+          handlePrintOrder={handlePrintOrder}
         />
       )}
     </div>

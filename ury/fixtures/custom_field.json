@@ -2053,7 +2053,7 @@
  },
  {
   "allow_in_quick_entry": 0,
-  "allow_on_submit": 0,
+  "allow_on_submit": 1,
   "bold": 0,
   "collapsible": 0,
   "collapsible_depends_on": null,
@@ -2084,7 +2084,7 @@
   "label": "Invoice Printed",
   "length": 0,
   "mandatory_depends_on": null,
-  "modified": "2023-09-15 10:51:57.172815",
+  "modified": "2025-11-04 15:56:32.172815",
   "module": null,
   "name": "POS Invoice-invoice_printed",
   "no_copy": 0,

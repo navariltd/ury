@@ -17,6 +17,7 @@ interface PaymentDialogProps {
   owner: string;
   fetchOrders: () => Promise<void>;
   clearSelectedOrder: () => void;
+  handlePrintOrder: () => Promise<void>;
 }
 
 const PaymentDialog: React.FC<PaymentDialogProps> = ({
@@ -31,6 +32,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
   owner,
   fetchOrders,
   clearSelectedOrder,
+  handlePrintOrder,
 }) => {
   const {
     paymentModes,
@@ -115,7 +117,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setIsProcessing(true);
     setError(null);
     try {
-      await call.post("ury.ury.doctype.ury_order.ury_order.make_invoice", {
+      const res = await call.post("ury.ury.doctype.ury_order.ury_order.make_invoice", {
         additionalDiscount: discountValue ? parseInt(discountValue) : null,
         cashier,
         customer,
@@ -125,6 +127,9 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         pos_profile: posProfile,
         table,
       });
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await handlePrintOrder();
 
       if (typeof window !== "undefined" && (window as any).showToast) {
         (window as any).showToast.success("Payment successful");
