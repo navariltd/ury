@@ -26,7 +26,6 @@ import { Textarea } from "../components/ui/textarea";
 import { usePOSStore } from "../store/pos-store";
 import { useNavigate } from "react-router-dom";
 import PaymentDialog from "../components/PaymentDialog";
-import { printOrder } from "../lib/print";
 import { call } from "../lib/frappe-sdk";
 
 export default function Orders() {
@@ -193,23 +192,16 @@ export default function Orders() {
     if (!selectedOrder || !posStore.posProfile) return;
     setIsPrinting(true);
     try {
-      const printFormat = 
-        posStore.posProfile.print_format || "POS Invoice";
-
-      const printUrl = `/printview?doctype=POS Invoice&name=${encodeURIComponent(
-        selectedOrder.name
-      )}&format=${encodeURIComponent(printFormat)}&no_letterhead=0&_lang=en`;
-
-      // Fetch printable HTML
-      const response = await fetch(printUrl, {
-        credentials: "include",
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch print content");
-      }
-
-      const html = await response.text();
+      const res = await call.post(
+        "ury.ury.api.ury_print.print_pos_invoice",
+        {
+          doctype: "POS Invoice",
+          name: selectedOrder.name,
+          format_name: posStore.posProfile?.print_format || "POS Invoice",
+          letter_head: posStore.posProfile?.letter_head || "",
+          no_letterhead: 0,
+        }
+      )
 
       // Create a hidden iframe for printing
       const printFrame = document.createElement("iframe");
@@ -223,7 +215,7 @@ export default function Orders() {
 
       const frameDoc = printFrame.contentWindow?.document;
       frameDoc?.open();
-      frameDoc?.write(html);
+      frameDoc?.write(res.message);
       frameDoc?.close();
 
       // Wait for iframe content to fully load before printing
@@ -233,12 +225,6 @@ export default function Orders() {
 
         setTimeout(() => document.body.removeChild(printFrame), 2000);
       }
-
-      // const printUrl = `/app/print/${encodeURIComponent("POS Invoice")}/${encodeURIComponent(
-      //     selectedOrder.name
-      //   )}?format=${encodeURIComponent(printFormat)}&no_letterhead=0`;
-
-      // window.open(printUrl, "_blank");
 
       // Update backend to mark invoice as printed
       await call.post("frappe.client.set_value", {

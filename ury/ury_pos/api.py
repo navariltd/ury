@@ -1,18 +1,14 @@
-import json
-from datetime import date, datetime, timedelta
-from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
-    make_closing_entry_from_opening,
-    get_pos_invoices,
-)
-
+from datetime import timedelta
 
 import frappe
-from frappe import _
-from frappe.utils import flt
-from datetime import timedelta
-from frappe.query_builder import DocType
+from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
+    get_pos_invoices,
+    make_closing_entry_from_opening,
+)
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import get_stock_availability
-
+from frappe import _
+from frappe.query_builder import DocType
+from frappe.utils import flt
 
 UMI = DocType("URY Menu Item")
 IT = DocType("Item")
@@ -91,7 +87,6 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
     elif room:
-
         room_wise_menu = frappe.db.get_value(
             "URY Restaurant", restaurant, "room_wise_menu"
         )
@@ -147,7 +142,9 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
             stock_balance = "QSR"
         else:
             # Check stock only if item does not have a BOM
-            stock_balance = get_stock_availability(item.item_code, pos_profile_doc.warehouse)[0]
+            stock_balance = get_stock_availability(
+                item.item_code, pos_profile_doc.warehouse
+            )[0]
 
         menu_items_with_stock_count.append(
             {
@@ -223,10 +220,12 @@ def getBranch():
 def getBranchRoom():
     user = frappe.session.user
     if user != "Administrator":
-        return [{
-            "name": None,
-            "branch": None,
-        }]
+        return [
+            {
+                "name": None,
+                "branch": None,
+            }
+        ]
 
     sql_query = """
         SELECT b.branch , a.room
@@ -238,21 +237,29 @@ def getBranchRoom():
     branch_array = frappe.db.sql(sql_query, user, as_dict=True)
 
     if not branch_array:
-        frappe.throw("User is not linked to any branch. Please contact your administrator.")
-    
+        frappe.throw(
+            "User is not linked to any branch. Please contact your administrator."
+        )
+
     branch_name = branch_array[0].get("branch")
     room_name = branch_array[0].get("room")
 
     if not branch_name:
-        frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+        frappe.throw(
+            "Branch information is missing for the user. Please contact your administrator."
+        )
 
     if not room_name:
-        frappe.throw("No room assigned to this user. Please contact your administrator.")
+        frappe.throw(
+            "No room assigned to this user. Please contact your administrator."
+        )
 
-    return [{
-        "name":room_name ,
-        "branch": branch_name,
-    }]
+    return [
+        {
+            "name": room_name,
+            "branch": branch_name,
+        }
+    ]
 
 
 @frappe.whitelist()
@@ -303,11 +310,11 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
     if status == "Draft":
         invoices = frappe.db.sql(
             """
-            SELECT 
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
-                pi.posting_date, pi.rounded_total, pi.order_type 
+            SELECT
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+                pi.posting_date, pi.rounded_total, pi.order_type
             FROM `tabPOS Invoice` pi
             LEFT JOIN `tabUser` u ON pi.cashier = u.email
             WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
@@ -320,15 +327,14 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         )
         updatedlist.extend(invoices)
     elif status == "Unbilled":
-
         docstatus = "Draft"
         invoices = frappe.db.sql(
             """
-            SELECT 
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
-                pi.posting_date, pi.rounded_total, pi.order_type 
+            SELECT
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+                pi.posting_date, pi.rounded_total, pi.order_type
             FROM `tabPOS Invoice` pi
             LEFT JOIN `tabUser` u ON pi.cashier = u.email
             WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
@@ -344,11 +350,11 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         docstatus = "Paid"
         invoices = frappe.db.sql(
             """
-            SELECT 
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+            SELECT
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
                 pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount 
+                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
             FROM `tabPOS Invoice` pi
             LEFT JOIN `tabUser` u ON pi.cashier = u.email
             WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
@@ -360,12 +366,11 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
         )
         updatedlist.extend(invoices)
     else:
-
         invoices = frappe.db.sql(
             """
-            SELECT 
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+            SELECT
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
                 pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
                 pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
             FROM `tabPOS Invoice` pi
@@ -396,14 +401,14 @@ def getPosInvoice(status, limit, limit_start):
     if status == "Draft":
         invoices = frappe.db.sql(
             """
-            SELECT 
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
-                pi.posting_date, pi.rounded_total, pi.order_type 
+            SELECT
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+                pi.posting_date, pi.rounded_total, pi.order_type
             FROM `tabPOS Invoice` pi
             LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s 
+            WHERE pi.branch = %s AND pi.status = %s
             AND (pi.invoice_printed = 1 OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = ''))
             ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
@@ -413,18 +418,17 @@ def getPosInvoice(status, limit, limit_start):
         )
         updatedlist.extend(invoices)
     elif status == "Unbilled":
-
         docstatus = "Draft"
         invoices = frappe.db.sql(
             """
-            SELECT 
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
-                pi.posting_date, pi.rounded_total, pi.order_type 
+            SELECT
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+                pi.posting_date, pi.rounded_total, pi.order_type
             FROM `tabPOS Invoice` pi
             LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s 
+            WHERE pi.branch = %s AND pi.status = %s
             AND (pi.invoice_printed = 0 AND pi.restaurant_table IS NOT NULL)
             ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
@@ -437,14 +441,14 @@ def getPosInvoice(status, limit, limit_start):
         docstatus = "Paid"
         invoices = frappe.db.sql(
             """
-            SELECT 
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+            SELECT
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
                 pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount 
+                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
             FROM `tabPOS Invoice` pi
             LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s 
+            WHERE pi.branch = %s AND pi.status = %s
             ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
@@ -453,17 +457,16 @@ def getPosInvoice(status, limit, limit_start):
         )
         updatedlist.extend(invoices)
     else:
-
         invoices = frappe.db.sql(
             """
-            SELECT 
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time, 
+            SELECT
+                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
                 pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
                 pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
             FROM `tabPOS Invoice` pi
             LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s 
+            WHERE pi.branch = %s AND pi.status = %s
             ORDER BY pi.modified desc
             LIMIT %s OFFSET %s
             """,
@@ -491,9 +494,9 @@ def searchPosInvoice(query, status):
     if status == "Recently Paid":
         status_condition = "pi.status = 'Paid'"
     elif status == "Unbilled":
-        status_condition = """pi.status = 'Draft' 
-        AND pi.restaurant_table IS NOT NULL 
-        AND pi.restaurant_table != '' 
+        status_condition = """pi.status = 'Draft'
+        AND pi.restaurant_table IS NOT NULL
+        AND pi.restaurant_table != ''
         AND pi.invoice_printed = 0"""
     else:
         status_condition = f"pi.status = '{status}'"
@@ -501,16 +504,16 @@ def searchPosInvoice(query, status):
     # Use SQL query to get orders with cashier full name
     pos_invoices = frappe.db.sql(
         f"""
-        SELECT 
+        SELECT
             pi.name, pi.customer, pi.grand_total, pi.posting_date, pi.posting_time,
-            pi.order_type, pi.restaurant_table, pi.status, pi.rounded_total, 
+            pi.order_type, pi.restaurant_table, pi.status, pi.rounded_total,
             pi.net_total, pi.mobile_number, pi.cashier, u.full_name as cashier_name
         FROM `tabPOS Invoice` pi
         LEFT JOIN `tabUser` u ON pi.cashier = u.email
         WHERE ({status_condition})
         AND (
-            LOWER(pi.name) LIKE %s 
-            OR LOWER(pi.customer) LIKE %s 
+            LOWER(pi.name) LIKE %s
+            OR LOWER(pi.customer) LIKE %s
             OR LOWER(pi.mobile_number) LIKE %s
         )
         ORDER BY pi.modified desc
@@ -560,9 +563,9 @@ def getCashier(room):
     cashier = None
     pos_opening_list = frappe.db.sql(
         """
-        SELECT DISTINCT `tabPOS Opening Entry`.name 
+        SELECT DISTINCT `tabPOS Opening Entry`.name
         FROM `tabPOS Opening Entry`
-        INNER JOIN `tabMultiple Rooms` 
+        INNER JOIN `tabMultiple Rooms`
         ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
         WHERE `tabPOS Opening Entry`.branch = %s
         AND `tabPOS Opening Entry`.status = 'Open'
@@ -615,9 +618,9 @@ def getPosProfile():
 
             pos_opening_list = frappe.db.sql(
                 """
-                SELECT DISTINCT `tabPOS Opening Entry`.name 
+                SELECT DISTINCT `tabPOS Opening Entry`.name
                 FROM `tabPOS Opening Entry`
-                INNER JOIN `tabMultiple Rooms` 
+                INNER JOIN `tabMultiple Rooms`
                 ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
                 WHERE `tabPOS Opening Entry`.branch = %s
                 AND `tabPOS Opening Entry`.status = 'Open'
@@ -661,7 +664,7 @@ def getPosProfile():
             print_type = "qz"
             qz_host = pos_profiles.qz_host
 
-        elif bill_present == True:
+        elif bill_present:
             print_type = "network"
 
         else:
@@ -735,7 +738,6 @@ def posOpening():
             "user": frappe.session.user,
         },
     )
-    print(pos_opening_list)
     if not pos_opening_list:
         return {"status": "not_opened", "opening_entry": None}
 
@@ -844,16 +846,16 @@ def getAllOrders(limit, limit_start):
 
     invoices = frappe.db.sql(
         """
-        SELECT 
-            pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table, 
-            pi.cashier, pi.waiter, u.full_name as waiter_name, pi.net_total, pi.posting_time, 
-            pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number, 
-            pi.posting_date, pi.rounded_total, pi.order_type 
+        SELECT
+            pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+            pi.cashier, pi.waiter, u.full_name as waiter_name, pi.net_total, pi.posting_time,
+            pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+            pi.posting_date, pi.rounded_total, pi.order_type
         FROM `tabPOS Invoice` pi
         LEFT JOIN `tabUser` u ON pi.waiter = u.email
         WHERE pi.branch = %s AND pi.status = 'Draft'
         AND (
-            pi.invoice_printed = 1 
+            pi.invoice_printed = 1
             OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = '')
             OR (pi.invoice_printed = 0 AND pi.order_type = 'Dine In')
         )
@@ -877,7 +879,6 @@ def getAllOrders(limit, limit_start):
 @frappe.whitelist()
 def create_opening_voucher(company: str, pos_profile: str, balance_details: list):
     try:
-
         new_pos_opening = frappe.get_doc(
             {
                 "doctype": "POS Opening Entry",

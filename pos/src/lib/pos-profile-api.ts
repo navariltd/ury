@@ -73,6 +73,7 @@ export interface PosProfileCombined extends PosProfileFull {
   waiter: string;
   cashier: string;
   print_format: string | null;
+  letter_head: string | null;
   qz_print: number;
   qz_host: string | null;
   printer: string | null;
@@ -113,7 +114,6 @@ export async function getPosProfileFull(posProfileName: string): Promise<PosProf
 export async function getCombinedPosProfile(): Promise<PosProfileCombined> {
   // Get limited fields first
   const limitedProfile = await getPosProfileLimitedFields();
-  console.log('limitedProfile', limitedProfile);
   
   // Get full profile using the pos_profile name from limited profile
   const fullProfile = await getPosProfileFull(limitedProfile.pos_profile);
