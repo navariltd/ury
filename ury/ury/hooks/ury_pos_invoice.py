@@ -91,7 +91,7 @@ class URYPOSInvoice(POSInvoice):
         """Validate that required raw materials for a QSR item are available."""
         if self.docstatus.is_draft() and not self.skip_raw_material_validation:
             bom = frappe.db.get_value(
-                "BOM", {"item": d.item_code, "is_default": 1}, "name"
+                "BOM", {"item": d.item_code, "is_default": 1, "is_active": 1}, "name"
             )
             if not bom:
                 frappe.throw(
@@ -183,11 +183,12 @@ class URYPOSInvoice(POSInvoice):
     def get_all_leaf_bom_items(bom, company, qsr_item_groups):
         """
         Recursively expand a BOM into its ultimate raw materials ("leaf items").
+        Respecting the "Do Not Explode" flag.
 
         - If a BOM item belongs to a QSR (make-to-order) group:
-                - Try to resolve its default BOM.
-                - If found, recurse deeper until only non-QSR or QSR items with no BOM remain.
-                - If no BOM exists, throw an error for misconfigured BOM.
+                - If it has "Do Not Explode" checked, treat as a leaf item.
+                - Else, it it has a default BOM, recurse deeper,
+                - If no default BOM exists, throw an error for misconfigured BOM.
         - If a BOM item is not in a QSR group:
                 - Treat it directly as a leaf raw material.
 
@@ -206,9 +207,16 @@ class URYPOSInvoice(POSInvoice):
         for rm_code, rm in bom_items.items():
             rm_item_group = frappe.db.get_value("Item", rm_code, "item_group")
 
-            if rm_item_group in qsr_item_groups:
+            do_not_explode = (
+                frappe.db.get_value(
+                    "BOM Item", {"parent": bom, "item_code": rm_code}, "do_not_explode"
+                )
+                or 0
+            )
+
+            if rm_item_group in qsr_item_groups and not do_not_explode:
                 child_bom = frappe.db.get_value(
-                    "BOM", {"item": rm_code, "is_default": 1}, "name"
+                    "BOM", {"item": rm_code, "is_default": 1, "is_active": 1}, "name"
                 )
                 if child_bom:
                     child_items = URYPOSInvoice.get_all_leaf_bom_items(
@@ -237,6 +245,7 @@ class URYPOSInvoice(POSInvoice):
                         )
                     )
             else:
+                # Either non-QSR or "Do Not Explode" = 1
                 items[rm_code] = items.get(
                     rm_code, {"qty": 0, "item_name": rm["item_name"]}
                 )
