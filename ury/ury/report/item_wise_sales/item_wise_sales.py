@@ -45,6 +45,7 @@ def apply_filters(filters):
     """
     Validate and prepare filters for SQL.
     Required: start_date, end_date, branch
+    Optional: start_time, end_time
     """
     if filters is None:
         filters = {}
@@ -52,6 +53,8 @@ def apply_filters(filters):
     start_date = filters.get("start_date")
     end_date = filters.get("end_date")
     branch = filters.get("branch")
+    start_time = filters.get("start_time") or "00:00:00"
+    end_time = filters.get("end_time") or "23:59:59"
 
     if not start_date:
         frappe.throw(_("Please select From Date"), exc=frappe.ValidationError)
@@ -60,9 +63,14 @@ def apply_filters(filters):
     if not branch:
         frappe.throw(_("Please select Branch"), exc=frappe.ValidationError)
 
-
     # return a clean dict used for SQL params
-    return {"start_date": start_date, "end_date": end_date, "branch": branch}
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "branch": branch,
+        "start_time": start_time,
+        "end_time": end_time,
+    }
 
 
 def get_data(filters):
@@ -112,6 +120,10 @@ def get_data(filters):
 		((rs.`hours` IS NULL OR rs.`hours` = 0) AND a.`posting_date` = date_list.`date`)
 		OR (rs.`hours` > 0 AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(DATE_ADD(date_list.`date`, INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) AND TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(date_list.`date`, CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')))
 		OR (rs.`branch` IS NULL AND a.`posting_date` = date_list.`date`)
+	)
+	AND (
+		TIMESTAMP(a.`posting_date`, a.`posting_time`) >= TIMESTAMP(%(start_date)s, %(start_time)s)
+		AND TIMESTAMP(a.`posting_date`, a.`posting_time`) <= TIMESTAMP(%(end_date)s, %(end_time)s)
 	)
 	GROUP BY 
 		c.`item_name`

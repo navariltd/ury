@@ -9,9 +9,21 @@ frappe.query_reports["Item Wise Sales"] = {
 			fieldtype: "Date",
 		},
 		{
+			fieldname: "start_time",
+			label: __("From Time"),
+			fieldtype: "Time",
+			default: "00:00:00",
+		},
+		{
 			fieldname: "end_date",
 			label: __("To Date"),
 			fieldtype: "Date",
+		},
+		{
+			fieldname: "end_time",
+			label: __("To Time"),
+			fieldtype: "Time",
+			default: "23:59:59",
 		},
 		{
 			fieldname: "branch",
