@@ -1,5 +1,5 @@
 {
- "add_total_row": 0,
+ "add_total_row": 1,
  "add_translate_data": 0,
  "columns": [],
  "creation": "2025-11-07 15:53:45.417262",
@@ -11,7 +11,7 @@
  "is_standard": "Yes",
  "letter_head": "Dar es Salaam",
  "letterhead": null,
- "modified": "2025-11-07 15:53:45.417262",
+ "modified": "2025-11-07 16:38:51.866862",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "Item Wise Sales",
