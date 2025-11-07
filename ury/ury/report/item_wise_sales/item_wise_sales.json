@@ -28,16 +28,7 @@
    "role": "Accounts User"
   },
   {
-   "role": "URY Cashier"
-  },
-  {
-   "role": "URY Captain"
-  },
-  {
    "role": "URY Manager"
-  },
-  {
-   "role": "System Manager"
   }
  ],
  "timeout": 0
