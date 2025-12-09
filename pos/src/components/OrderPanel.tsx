@@ -270,7 +270,7 @@ const OrderPanel = () => {
                           .join(", ")}
                       </p>
                     )}
-                    <p className="text-gray-600 text-sm">
+                    <p className="text-gray-600 text-xs">
                       {formatCurrency(calculateItemTotal(item))}
                     </p>
                   </div>
@@ -303,7 +303,7 @@ const OrderPanel = () => {
                       >
                         -
                       </Button>
-                      <span className="w-6 text-center">{item.quantity}</span>
+                      <span className="w-8 text-center">{item.quantity}</span>
                       <Button
                         onClick={() =>
                           updateQuantity(item.uniqueId!, item.quantity + 1)
