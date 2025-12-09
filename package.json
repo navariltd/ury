@@ -1,5 +1,8 @@
 {
   "private": true,
+  "engines": {
+    "node": ">=18.18.0"
+  },
   "scripts": {
     "ury-pos-install": "cd urypos && yarn install --check-files",
     "ury-pos-build": "cd urypos && yarn build",
