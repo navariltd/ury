@@ -10,7 +10,7 @@ import { getTableOrder, TableOrder } from '../lib/order-api';
 import { getPaymentModes } from '../lib/payment-api';
 
 // Constants
-const MAX_QUANTITY = 99;
+const MAX_QUANTITY = 9999;
 const MIN_QUANTITY = 0;
 const ITEMS_PER_PAGE = 10;
 

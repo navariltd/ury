@@ -217,16 +217,14 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
     }
 
     const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0 && num <= 99) {
+    if (!isNaN(num) && num >= 0 && num <= 9999) {
       setQuantity(num.toString());
     }
   };
 
   const handleIncrement = () => {
     const currentNum = quantity === '' ? 0 : parseInt(quantity, 10);
-    if (currentNum < 99) {
       setQuantity((currentNum + 1).toString());
-    }
   };
 
   const handleDecrement = () => {
@@ -379,7 +377,6 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
               <Input
                 type="number"
                 min="0"
-                max="99"
                 value={quantity}
                 onChange={(e) => handleQuantityChange(e.target.value)}
                 onBlur={() => {
