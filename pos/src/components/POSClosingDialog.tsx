@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import CurrencyInput from "react-currency-input-field";
-import { X, FileText, Loader2, Users } from "lucide-react";
+import { X, FileText, Loader2, AlertTriangle, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, Button } from "./ui";
 import { call } from "../lib/frappe-sdk";
 import { checkPOSOpening } from "../lib/pos-opening-api";
@@ -11,11 +11,18 @@ interface POSClosingDialogProps {
   user: any;
 }
 
+type ProcessingStage = 'idle' | 'closing' | 'success' | 'error'
+
 const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>('idle');
   const [openingEntry, setOpeningEntry] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<any | null>(null);
+  const [hasFailedClosing, setHasFailedClosing] = useState(false);
+  const [failedClosingEntry, setFailedClosingEntry] = useState<string | null>(null);
+  const [failedClosingError, setFailedClosingError] = useState<string | null>(null);
+
   const currencySymbol = getCurrencySymbol();
 
   useEffect(() => {
@@ -35,6 +42,13 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
         });
 
         if (res.message) {
+          // Check if there's a failed closing entry
+          if (res.message.has_failed_closing) {
+            setHasFailedClosing(true);
+            setFailedClosingEntry(res.message.failed_closing_entry);
+            setFailedClosingError(res.message.error_message);
+          }
+
           setSummary(res.message);
         }
       } catch (err) {
@@ -46,33 +60,98 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
     fetchData();
   }, [user]);
 
-  const handleClosePOS = async () => {
+  const handleClosePOS = async (isRetry: boolean = false) => {
     setIsProcessing(true);
+    setProcessingStage('closing');
     setError(null);
+
     try {
-      const res = await call.post("ury.ury_pos.api.submit_pos_closing", {
-        pos_opening_entry: openingEntry,
-        closing_amounts: summary.payments.map((p: any) => ({
-          mode_of_payment: p.mode_of_payment,
-          closing_amount: p.closing_amount || 0,
-        }))
-      });
+      let res;
+
+      if (isRetry && failedClosingEntry) {
+        // Retry the existing failed closing entry
+        res = await call.post("ury.ury_pos.api.retry_pos_closing", {
+            closing_entry_name: failedClosingEntry,
+        });
+      } else {
+          res = await call.post("ury.ury_pos.api.submit_pos_closing", {
+            pos_opening_entry: openingEntry,
+            closing_amounts: summary.payments.map((p: any) => ({
+              mode_of_payment: p.mode_of_payment,
+              closing_amount: p.closing_amount || 0,
+          }))
+        });
+      }
 
       if (res.message?.status === "success") {
-        if ((window as any).showToast) {
-          (window as any).showToast.success("POS closed successfully");
-        }
-        window.location.reload();
-        onClose();
+        setIsProcessing('success');
+
+        setTimeout(() => {
+          if ((window as any).showToast) {
+            (window as any).showToast.success("POS closed successfully");
+          }
+          window.location.reload();
+        }, 5000);
+      } else if (res.message?.status === "failed") {
+        setProcessingStage('error');
+        setHasFailedClosing(true);
+        setFailedClosingEntry(res.message.failed_closing_entry);
+        setFailedClosingError(res.message.error_message);
+        setError(res.message.error_message || "Failed to close POS. Please contact your administrator.")
       } else {
-        setError(res.message?.message || "Failed to close POS.");
+        setProcessingStage('error');
+        setError(res.message?.message || "Failed to close POS. Please contact your administrator.");
       }
     } catch (err: any) {
       console.error("Error closing POS:", err);
-      setError("Failed to close POS.");
+      setProcessingStage('error');
+      const errorMsg = err?.exception || err?.message || "Failed to close POS. Please contact your administrator.";
+      setError(errorMsg);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const renderProcessingOverlay = () => {
+    if (processingStage === 'idle') return null;
+
+    return (
+      <div className="absolute inset-0 bg-white/95 z-50 flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md px-6">
+          {processingStage === 'closing' && (
+            <>
+              <Loader2 className="w-16 h-16 animate-spin mx-auto text-blue-600" />
+              <h3 className="text-xl font-semibold">Closing POS...</h3>
+              <p className="text-gray-600">Please wait while we process the closing. This may take a moment.</p>
+            </>
+          )}
+          
+          {processingStage === 'success' && (
+            <>
+              <CheckCircle2 className="w-16 h-16 mx-auto text-green-600" />
+              <h3 className="text-xl font-semibold text-green-700">POS Closed Successfully!</h3>
+              <p className="text-gray-600">Redirecting...</p>
+            </>
+          )}
+          
+          {processingStage === 'error' && (
+            <>
+              <XCircle className="w-16 h-16 mx-auto text-red-600" />
+              <h3 className="text-xl font-semibold text-red-700">Closing Failed</h3>
+              <div className="text-sm text-gray-600 max-h-40 overflow-y-auto bg-red-50 p-3 rounded border border-red-200">
+                {error}
+              </div>
+              <Button 
+                onClick={() => setProcessingStage('idle')} 
+                className="mt-4"
+              >
+                Go Back
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -82,6 +161,9 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
         className="bg-white w-full max-w-4xl max-h-[90vh] flex flex-col p-0"
         showCloseButton={false}
       >
+
+        {renderProcessingOverlay()}
+
         <div className="flex justify-between items-center p-4 border-b border-gray-200">
           <h2 className="text-2xl font-bold">Close POS</h2>
           <Button onClick={onClose} variant="ghost" size="icon">
@@ -90,17 +172,37 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {error && (
+          {error && !processingStage && (
             <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-r-lg text-sm text-red-700">
               {error}
             </div>
           )}
 
+            {hasFailedClosing && (
+              <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-yellow-800 mb-1">Previous Closing Attempt Failed</h4>
+                    <p className="text-sm text-yellow-700 mb-3">
+                      A closing attempt failed. Here's what went wrong:
+                    </p>
+                    <div className="text-xs text-yellow-700 bg-yellow-100 p-3 rounded mb-3 max-h-32 overflow-y-auto">
+                      {failedClosingError}
+                    </div>
+                    <p className="text-sm text-yellow-700">
+                      You can retry the closing with updated amounts below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Invoices */}
             {summary?.pos_transactions?.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                  <FileText className="w-5 h-5" /> Invoices
+                  <FileText className="w-5 h-5" /> Invoices ({summary.pos_transactions.length})
                 </h3>
                 <ul className="divide-y border rounded-md">
                   {summary.pos_transactions.map((inv: any) => (
@@ -187,14 +289,14 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
 
         <div className="p-4 border-t border-gray-200">
           <Button
-            onClick={handleClosePOS}
+            onClick={() => handleClosePOS(hasFailedClosing)}
             disabled={isProcessing || !openingEntry || !summary}
             className="w-full"
           >
             {isProcessing ? (
               <span className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Closing...
+                {hasFailedClosing ? "Retrying..." : "Closing..."}
               </span>
             ) : !summary ? (
               <span className="flex items-center gap-2">
@@ -202,7 +304,10 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
                 Loading summary...
               </span>
             ): (
-              "Confirm Close"
+              <span className="flex items-center gap-2">
+                {hasFailedClosing && <RefreshCw className="w-4 h-4" />}
+                {hasFailedClosing ? "Retry Closing" : "Confirm Close"}
+              </span>
             )}
           </Button>
         </div>
