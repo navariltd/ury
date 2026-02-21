@@ -207,7 +207,7 @@ const POSClosingDialog: React.FC<POSClosingDialogProps> = ({ onClose, user }) =>
                 <ul className="divide-y border rounded-md">
                   {summary.pos_transactions.map((inv: any) => (
                     <li key={inv.name} className="flex justify-between px-4 py-2 text-sm">
-                      <span className="w-32">{inv.pos_invoice}</span>
+                      <span className="w-32">{inv.pos_invoice || inv.sales_invoice}</span>
                       <span className="w-28">{inv.posting_date}</span>
                       <span className="w-36">{formatCurrency(inv.grand_total || 0)}</span>
                     </li>
