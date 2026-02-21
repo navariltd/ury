@@ -20,22 +20,24 @@ class URYOrder(Document):
 def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
     """returns the active invoice linked to the given table"""
 
+    invoice_type = frappe.get_single_value("POS Settings", "invoice_type")
+
     if table:
         if is_payment == "Payments":
             invoice_name = frappe.get_value(
-                "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
+                invoice_type, dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
 
         else:
             if invoiceNo:
                 invoice_name = frappe.get_value(
-                    "POS Invoice",
+                    invoice_type,
                     dict(restaurant_table=table, docstatus=0, name=invoiceNo),
                 )
 
             else:
                 invoice_name = frappe.get_value(
-                    "POS Invoice",
+                    invoice_type,
                     dict(restaurant_table=table, docstatus=0, invoice_printed=0),
                 )
 
@@ -43,10 +45,10 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
         if invoice_name:
-            invoice = frappe.get_doc("POS Invoice", invoice_name)
+            invoice = frappe.get_doc(invoice_type, invoice_name)
 
         else:
-            invoice = frappe.new_doc("POS Invoice")
+            invoice = frappe.new_doc(invoice_type)
 
             invoice.naming_series = frappe.db.get_value(
                 "URY Restaurant", restaurant, "invoice_series_prefix"
@@ -74,19 +76,19 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
     else:
         if is_payment == "Payments":
             invoice_name = frappe.get_value(
-                "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
+                invoice_type, dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
 
         else:
             invoice_name = frappe.get_value(
-                "POS Invoice", dict(docstatus=0, name=invoiceNo)
+                invoice_type, dict(docstatus=0, name=invoiceNo)
             )
 
         if invoice_name:
-            invoice = frappe.get_doc("POS Invoice", invoice_name)
+            invoice = frappe.get_doc(invoice_type, invoice_name)
 
         else:
-            invoice = frappe.new_doc("POS Invoice")
+            invoice = frappe.new_doc(invoice_type)
             invoice.is_pos = 1
             invoice.update_stock = 1
 
@@ -131,15 +133,16 @@ def sync_order(
 ):
     user_role = frappe.get_roles()
     posprofile = frappe.get_doc("POS Profile", pos_profile)
-
     billing_user = any(
         role.role in user_role for role in posprofile.role_allowed_for_billing
     )
 
+    invoice_type = frappe.get_single_value("POS Settings", "invoice_type")
+
     # Check if the last invoice was already billed
     if (
         last_invoice
-        and frappe.db.get_value("POS Invoice", last_invoice, "invoice_printed") == 1
+        and frappe.db.get_value(invoice_type, last_invoice, "invoice_printed") == 1
         and (not billing_user)
     ):
         frappe.msgprint(
@@ -212,6 +215,9 @@ def sync_order(
     invoice.custom_aggregator_id = aggregator_id
     invoice.custom_restaurant_room = room
     invoice.restaurant_table = table
+
+    if invoice_type == "Sales Invoice":
+        invoice.is_created_using_pos = 1
 
     if order_type == "Aggregators":
         price_list = frappe.db.get_value(
