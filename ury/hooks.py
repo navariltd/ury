@@ -121,6 +121,7 @@ website_route_rules = [
 
 override_doctype_class = {
 	"POS Invoice": "ury.ury.hooks.ury_pos_invoice.URYPOSInvoice",
+	"Sales Invoice": "ury.ury.hooks.ury_sales_invoice.URYSalesInvoice",
 }
 
 # Document Events
