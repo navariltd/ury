@@ -89,6 +89,7 @@ class URYSalesInvoice(SalesInvoice):
 		self.validate_invoice()
 		self.validate_customer()
 		self.validate_price_list()
+		self.validate_stock_availablility()
 
 		if self.taxes_and_charges and not len(self.get("taxes")):
 			self.set_taxes()
