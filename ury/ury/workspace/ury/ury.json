@@ -1,15 +1,12 @@
 {
+ "app": "ury",
  "charts": [],
- "content": "[{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"URY Setup\",\"col\":3}},{\"id\":\"YXLBzy46Bq\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"URY POS\",\"col\":2}},{\"id\":\"OJsNZQxJi3\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"POS V1\",\"col\":2}}]",
+ "content": "[{\"id\":\"PO4EylCUq0\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Quick Access<br></span>\",\"col\":12}},{\"id\":\"50ST2ReGAE\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"URY POS\",\"col\":4}},{\"id\":\"8E_1yk1JJR\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"LtBHRsxxNd\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Profile\",\"col\":4}},{\"id\":\"aTG8Wmqx5m\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"POS Opening Entry\",\"col\":4}},{\"id\":\"sj0dPiVvH7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Pos Closing Entry\",\"col\":4}},{\"id\":\"VCTWrfn8Od\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"3XhkKI6EJA\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":4}},{\"id\":\"cCa51qjRr6\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":4}},{\"id\":\"SRsidT1_JH\",\"type\":\"card\",\"data\":{\"card_name\":\"Sales Report\",\"col\":4}}]",
  "creation": "2023-11-30 12:04:38.330350",
  "custom_blocks": [
   {
    "custom_block_name": "URY POS",
    "label": "URY POS"
-  },
-  {
-   "custom_block_name": "POS V1",
-   "label": "POS V1"
   }
  ],
  "docstatus": 0,
@@ -24,21 +21,10 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "URY Setup",
-   "link_count": 8,
-   "link_type": "DocType",
+   "label": "Setup",
+   "link_count": 6,
    "onboard": 0,
    "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Branch",
-   "link_count": 0,
-   "link_to": "Branch",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
   },
   {
    "hidden": 0,
@@ -53,9 +39,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "POS Profile",
+   "label": "Branch",
    "link_count": 0,
-   "link_to": "POS Profile",
+   "link_to": "Branch",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -66,16 +52,6 @@
    "label": "URY Menu",
    "link_count": 0,
    "link_to": "URY Menu",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "URY Menu Course",
-   "link_count": 0,
-   "link_to": "URY Menu Course",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -109,9 +85,129 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Sales Report",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daywise Invoices",
+   "link_count": 0,
+   "link_to": "Daywise Invoices",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Daywise Sales",
+   "link_count": 0,
+   "link_to": "Daywise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "report_ref_doctype": "POS Invoice",
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Today's Sales",
+   "link_count": 0,
+   "link_to": "Today's Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Daywise Customer Details",
+   "link_count": 0,
+   "link_to": "Daywise Customer Details",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Time Wise Sales",
+   "link_count": 0,
+   "link_to": "Time Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Reports",
+   "link_count": 5,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Employee Item Wise Sales",
+   "link_count": 0,
+   "link_to": "Employee Item Wise Sales",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "POS Register",
+   "link_count": 0,
+   "link_to": "POS Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Register",
+   "link_count": 0,
+   "link_to": "Sales Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Sales Payment Summary",
+   "link_count": 0,
+   "link_to": "Sales Payment Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-07-25 10:51:43.683224",
+ "modified": "2026-02-22 13:27:54.488954",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY",
@@ -131,7 +227,33 @@
    "role": "URY Cashier"
   }
  ],
- "sequence_id": 31.0,
- "shortcuts": [],
- "title": "URY"
+ "sequence_id": 22.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "POS Opening Entry",
+   "link_to": "POS Opening Entry",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "POS Profile",
+   "link_to": "POS Profile",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Pos Closing Entry",
+   "link_to": "POS Closing Entry",
+   "stats_filter": "[]",
+   "type": "DocType"
+  }
+ ],
+ "title": "URY",
+ "type": "Workspace"
 }
