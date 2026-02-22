@@ -8,6 +8,7 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "invoice_type",
   "invoice",
   "restaurant_table",
   "customer_name",
@@ -253,12 +254,19 @@
    "fieldtype": "Data",
    "label": "Total Production Time",
    "read_only": 1
+  },
+  {
+   "default": "POS Invoice",
+   "fieldname": "invoice_type",
+   "fieldtype": "Select",
+   "label": "Invoice Type",
+   "options": "\nPOS Invoice\nSales Invoice"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-08-26 12:28:58.664903",
+ "modified": "2026-02-22 16:57:32.764400",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT",
@@ -305,6 +313,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

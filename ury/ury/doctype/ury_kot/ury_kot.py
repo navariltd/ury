@@ -150,12 +150,13 @@ class URYKOT(Document):
         company, fg_warehouse = frappe.db.get_value(
             "POS Profile", self.pos_profile, ["company", "warehouse"]
         )
+        invoice_type = self.invoice_type
         invoice_id = self.invoice
-        if not invoice_id:
+        if not invoice_id or not invoice_type:
             frappe.throw(_("Cannot process Work Orders without an Invoice ID"))
 
-        all_kots = get_all_kots(invoice_id)
-        existing_wos = get_existing_work_orders(invoice_id)
+        all_kots = get_all_kots(invoice_type, invoice_id)
+        existing_wos = get_existing_work_orders(invoice_type, invoice_id)
         existing_map = {wo.production_item: wo for wo in existing_wos}
 
         if handle_full_cancellation(all_kots, existing_wos):
@@ -165,23 +166,23 @@ class URYKOT(Document):
 
         item_totals = calculate_item_totals(all_kots, replaced_kots)
 
-        sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_id)
+        sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_type, invoice_id)
 
         cleanup_obsolete_work_orders(item_totals, existing_map)
 
 
-def get_all_kots(invoice_id):
+def get_all_kots(invoice_type, invoice_id):
     return frappe.get_all(
         "URY KOT",
-        filters={"invoice": invoice_id},
+        filters={"invoice_type": invoice_type, "invoice": invoice_id},
         fields=["name", "type", "original_kot"],
     )
 
 
-def get_existing_work_orders(invoice_id):
+def get_existing_work_orders(invoice_type, invoice_id):
     return frappe.get_all(
         "Work Order",
-        filters={"pos_invoice": invoice_id},
+        filters={"invoice_type": invoice_type, "invoice": invoice_id},
         fields=["name", "production_item", "qty", "docstatus"],
     )
 
@@ -264,7 +265,7 @@ def calculate_item_totals(all_kots, replaced_kots):
     return item_totals
 
 
-def sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_id):
+def sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_type, invoice_id):
     """
     Creates or updates Work Orders based on calculated item totals.
     """
@@ -293,7 +294,8 @@ def sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_i
                         "qty": required_qty,
                         "company": company,
                         "fg_warehouse": fg_warehouse,
-                        "pos_invoice": invoice_id,
+                        "invoice_type": invoice_type,
+                        "invoice": invoice_id,
                     }
                 )
                 wo_doc.insert()
@@ -353,13 +355,13 @@ def on_kot_update(doc, method):
 
     work_orders = frappe.get_all(
         "Work Order",
-        filters={"pos_invoice": doc.invoice},
+        filters={"invoice_type": doc.invoice_type, "invoice": doc.invoice},
         fields=["name", "status", "docstatus"],
     )
 
     if not work_orders:
         frappe.logger().info(
-            f"No Work Orders found for invoice {doc.invoice} (KOT {doc.name})"
+            f"No Work Orders found for invoice {doc.invoice_type} {doc.invoice} (KOT {doc.name})"
         )
         return
 
