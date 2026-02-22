@@ -487,7 +487,7 @@ class URYPOSInvoice(POSInvoice):
 
         work_orders = frappe.get_all(
             "Work Order",
-            filters={"pos_invoice": self.name},
+            filters={"invoice_type": "POS Invoice", "invoice": self.name},
             fields=["name", "status", "docstatus", "qty", "produced_qty"],
         )
 
@@ -609,7 +609,7 @@ class URYPOSInvoice(POSInvoice):
             kot_doc.save(ignore_permissions=True)
 
         kots = frappe.get_all(
-            "URY KOT", filters={"invoice": self.name}, fields=["name"]
+            "URY KOT", filters={"invoice_type": "POS Invoice", "invoice": self.name}, fields=["name"]
         )
 
         for kot in kots:
