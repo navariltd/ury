@@ -304,12 +304,12 @@ def sync_order(
         frappe.throw(f"Error while updating order: {e}")
 
     try:
-        kot_execute(invoice.name, customer, table, items, past_item, comments)
+        kot_execute(invoice_type, invoice.name, customer, table, items, past_item, comments)
 
     except Exception as e:
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without affect the code execution.
-        error_msg = f"KOT Creation Failes {str(e)}"
-        frappe.log_error(error_msg, "KOT Error")
+        error_msg = f"KOT Creation Failed {str(e)}"
+        frappe.log_error(title="KOT Error", message=error_msg)
 
     # table status
     if invoice.invoice_printed == 0:
