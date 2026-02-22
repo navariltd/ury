@@ -27,6 +27,7 @@ def create_order_items(items):
 
 # Create a KOT (Kitchen Order Ticket) document
 def create_kot_doc(
+    invoice_type,
     invoice_id,
     customer,
     restaurant_table,
@@ -37,7 +38,7 @@ def create_kot_doc(
     kot_naming_series,
     production,
 ):
-    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
+    pos_invoice = frappe.get_doc(invoice_type, invoice_id)
     order_number = pos_invoice.custom_ury_order_number
     is_aggregator = 0
     if pos_invoice.order_type == "Aggregators":
@@ -45,6 +46,7 @@ def create_kot_doc(
     kot_doc = frappe.get_doc(
         {
             "doctype": "URY KOT",
+            "invoice_type": invoice_type,
             "invoice": invoice_id,
             "restaurant_table": restaurant_table,
             "customer_name": customer,
@@ -108,6 +110,7 @@ def get_all_production_item_groups(branch):
 
 # Process items to create KOT documents
 def process_items_for_kot(
+    invoice_type,
     invoice_id,
     customer,
     restaurant_table,
@@ -167,6 +170,7 @@ def process_items_for_kot(
                     kot_type = "Order Modified"
 
                 create_kot_doc(
+                    invoice_type,
                     invoice_id,
                     customer,
                     restaurant_table,
@@ -185,6 +189,7 @@ def process_items_for_kot(
 
 # Process items to create a cancel KOT document
 def process_items_for_cancel_kot(
+    invoice_type,
     invoice_id,
     customer,
     restaurant_table,
@@ -216,6 +221,7 @@ def process_items_for_cancel_kot(
 
         if production_items:
             create_cancel_kot_doc(
+                invoice_type,
                 invoice_id,
                 restaurant_table,
                 production_items,
@@ -231,6 +237,7 @@ def process_items_for_cancel_kot(
 
 # Create a cancel KOT document
 def create_cancel_kot_doc(
+    invoice_type,
     invoice_id,
     restaurant_table,
     cancel_items,
@@ -242,7 +249,7 @@ def create_cancel_kot_doc(
     invoiceItems,
     production,
 ):
-    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
+    pos_invoice = frappe.get_doc(invoice_type, invoice_id)
     order_number = pos_invoice.custom_ury_order_number  
     is_aggregator = 0
     if pos_invoice.order_type == "Aggregators":
@@ -321,6 +328,7 @@ def create_cancel_kot_doc(
 # Whitelisted function to handle KOT entry
 @frappe.whitelist()
 def kot_execute(
+    invoice_type,
     invoice_id,
     customer,
     restaurant_table=None,
@@ -336,7 +344,7 @@ def kot_execute(
     final_array = compare_two_array(new_Order_items_array, new_invoice_items_array)
     removed_item = get_removed_items(new_invoice_items_array, new_Order_items_array)
 
-    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
+    pos_invoice = frappe.get_doc(invoice_type, invoice_id)
     pos_profile_id = pos_invoice.pos_profile
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
     kot_naming_series = pos_profile.custom_kot_naming_series
@@ -353,6 +361,7 @@ def kot_execute(
     total_cancel_items = negative_qty_items + removed_item
     if positive_qty_items:
         process_items_for_kot(
+            invoice_type,
             invoice_id,
             customer,
             restaurant_table,
@@ -364,6 +373,7 @@ def kot_execute(
         )
     if total_cancel_items:
         process_items_for_cancel_kot(
+            invoice_type,
             invoice_id,
             customer,
             restaurant_table,
