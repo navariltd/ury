@@ -32,10 +32,10 @@ class URYKOT(Document):
 
         pos_kot_printers = frappe.db.get_all(
             "URY Printer Settings",
-            fields=["printer", "custom_kot_print_format", "custom_kot_print"],
+            fields=["printer", "kot_print_format", "kot_print"],
             filters={
                 "parent": self.pos_profile,
-                "custom_kot_print": 1,
+                "kot_print": 1,
                 "parenttype": "POS Profile",
             },
             order_by="idx",
@@ -47,13 +47,13 @@ class URYKOT(Document):
                 "URY Printer Settings",
                 fields=[
                     "printer",
-                    "custom_kot_print_format",
-                    "custom_kot_print",
-                    "custom_block_takeaway_kot",
+                    "kot_print_format",
+                    "kot_print",
+                    "block_takeaway_kot",
                 ],
                 filters={
                     "parent": self.production,
-                    "custom_kot_print": 1,
+                    "kot_print": 1,
                     "parenttype": "URY Production Unit",
                 },
                 order_by="idx",
@@ -63,11 +63,11 @@ class URYKOT(Document):
             if production_unit_printers:
                 for printer in production_unit_printers:
                     pos_print_flag = False
-                    if printer.custom_block_takeaway_kot == 1:
+                    if printer.block_takeaway_kot == 1:
                         if self.restaurant_table and self.table_takeaway == 0:
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            print_kot(printer.printer, printer.kot_print_format)
                     else:
-                        print_kot(printer.printer, printer.custom_kot_print_format)
+                        print_kot(printer.printer, printer.kot_print_format)
 
                 # Check if restaurant table is specified and it's not a takeaway order
                 if self.restaurant_table and self.table_takeaway == 0:
@@ -79,12 +79,12 @@ class URYKOT(Document):
                         "URY Printer Settings",
                         fields=[
                             "printer",
-                            "custom_kot_print_format",
-                            "custom_kot_print",
+                            "kot_print_format",
+                            "kot_print",
                         ],
                         filters={
                             "parent": room,
-                            "custom_kot_print": 1,
+                            "kot_print": 1,
                             "parenttype": "URY Room",
                         },
                         order_by="idx",
@@ -94,19 +94,19 @@ class URYKOT(Document):
                     if room_kot_printers:
                         for printer in room_kot_printers:
                             pos_print_flag = False
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            print_kot(printer.printer, printer.kot_print_format)
 
                     if pos_print_flag:
                         if pos_kot_printers:
                             for printer in pos_kot_printers:
                                 print_kot(
-                                    printer.printer, printer.custom_kot_print_format
+                                    printer.printer, printer.kot_print_format
                                 )
 
                 else:
                     if pos_kot_printers:
                         for printer in pos_kot_printers:
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            print_kot(printer.printer, printer.kot_print_format)
 
     # Function for displaying KOT-related information in real-time On KDS(Kitchen Display System)
     def kotDisplayRealtime(self):

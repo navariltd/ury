@@ -7,7 +7,11 @@
  "engine": "InnoDB",
  "field_order": [
   "bill",
-  "printer"
+  "kot_print",
+  "block_takeaway_kot",
+  "column_break_zxfc",
+  "printer",
+  "kot_print_format"
  ],
  "fields": [
   {
@@ -23,18 +27,45 @@
    "in_list_view": 1,
    "label": "Printer",
    "options": "Network Printer Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "kot_print",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "KOT Print"
+  },
+  {
+   "depends_on": "kot_print",
+   "fieldname": "kot_print_format",
+   "fieldtype": "Link",
+   "label": "KOT Print Format",
+   "options": "Print Format"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.parenttype=='URY Production Unit' && doc.kot_print == 1",
+   "fieldname": "block_takeaway_kot",
+   "fieldtype": "Check",
+   "label": "Block Takeaway KOT"
+  },
+  {
+   "fieldname": "column_break_zxfc",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-09-28 23:37:08.879383",
+ "modified": "2026-02-23 19:39:37.329819",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Printer Settings",
  "naming_rule": "Autoincrement",
  "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
