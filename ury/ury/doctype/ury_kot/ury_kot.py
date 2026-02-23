@@ -296,6 +296,7 @@ def sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_t
                         "fg_warehouse": fg_warehouse,
                         "invoice_type": invoice_type,
                         "invoice": invoice_id,
+                        "is_pos_manufacture": 1,
                     }
                 )
                 wo_doc.insert()
