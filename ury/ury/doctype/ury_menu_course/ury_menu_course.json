@@ -9,7 +9,10 @@
  "document_type": "Setup",
  "engine": "InnoDB",
  "field_order": [
-  "course"
+  "course",
+  "serving_priority",
+  "column_break_znas",
+  "indicate_in_kds"
  ],
  "fields": [
   {
@@ -21,11 +24,26 @@
    "oldfieldtype": "Data",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "serving_priority",
+   "fieldtype": "Int",
+   "label": "Serving Priority"
+  },
+  {
+   "fieldname": "column_break_znas",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "indicate_in_kds",
+   "fieldtype": "Check",
+   "label": "Indicate in KDS"
   }
  ],
  "icon": "fa fa-code-fork",
  "links": [],
- "modified": "2024-05-02 16:14:56.862267",
+ "modified": "2026-02-23 19:46:50.989572",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY Menu Course",
@@ -67,6 +85,7 @@
   }
  ],
  "quick_entry": 1,
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
