@@ -28,7 +28,7 @@ const OrderStatusSidebar = ({
     <div
       className={cn(
         // Desktop: fixed sidebar
-        "lg:w-64 bg-white border-r lg:border-r border-b lg:border-b-0 border-gray-200 h-full flex flex-col",
+        "lg:w-64 bg-white border-r lg:border-r border-b lg:border-b-0 border-gray-200 lg:h-full flex flex-col",
         // Mobile: horizontal scroll
         "w-full",
         disabled && "opacity-50 pointer-events-none",
