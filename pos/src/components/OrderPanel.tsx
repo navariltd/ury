@@ -220,10 +220,10 @@ const OrderPanel = () => {
         // Desktop: fixed right sidebar
         // Mobile: bottom sheet that can be toggled
         "bg-white border-l border-gray-200 flex flex-col",
-        "lg:w-96 lg:h-[calc(100vh-4rem)] lg:fixed lg:right-0 lg:z-10",
+        "lg:w-96 lg:h-[calc(100vh-4rem)] lg:fixed lg:right-0 lg:left-auto lg:bottom-auto lg:z-10",
         // Mobile: full width, slide up from bottom
         "fixed bottom-0 left-0 right-0 z-50",
-        "max-h-[80vh] rounded-t-2xl lg:rounded-none shadow-2xl lg:shadow-none",
+        "max-h-[80vh] lg:max-h-none rounded-t-2xl lg:rounded-none shadow-2xl lg:shadow-none",
         "transform transition-transform duration-300 ease-in-out",
         isOrderPanelOpen ? "translate-y-0" : "translate-y-[calc(100%-5rem)]",
         "lg:translate-y-0", // Always visible on desktop
