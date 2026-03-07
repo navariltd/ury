@@ -136,7 +136,7 @@ export default function Orders() {
     setEditLoading(true);
     try {
       const res = await fetch(
-        `/api/method/frappe.client.get?doctype=POS+Invoice&name=${selectedOrder.name}`,
+        `/api/method/frappe.client.get?doctype=${selectedOrder.doctype}&name=${selectedOrder.name}`
       );
       if (!res.ok) throw new Error("Failed to fetch order details");
       const data = await res.json();

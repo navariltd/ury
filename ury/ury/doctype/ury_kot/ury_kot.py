@@ -7,7 +7,7 @@ import frappe
 from erpnext.manufacturing.doctype.work_order.work_order import make_stock_entry
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import get_datetime, now
+from frappe.utils import get_datetime, now, flt
 from frappe.utils.print_format import print_by_server
 
 
@@ -32,10 +32,10 @@ class URYKOT(Document):
 
         pos_kot_printers = frappe.db.get_all(
             "URY Printer Settings",
-            fields=["printer", "custom_kot_print_format", "custom_kot_print"],
+            fields=["printer", "kot_print_format", "kot_print"],
             filters={
                 "parent": self.pos_profile,
-                "custom_kot_print": 1,
+                "kot_print": 1,
                 "parenttype": "POS Profile",
             },
             order_by="idx",
@@ -47,13 +47,13 @@ class URYKOT(Document):
                 "URY Printer Settings",
                 fields=[
                     "printer",
-                    "custom_kot_print_format",
-                    "custom_kot_print",
-                    "custom_block_takeaway_kot",
+                    "kot_print_format",
+                    "kot_print",
+                    "block_takeaway_kot",
                 ],
                 filters={
                     "parent": self.production,
-                    "custom_kot_print": 1,
+                    "kot_print": 1,
                     "parenttype": "URY Production Unit",
                 },
                 order_by="idx",
@@ -63,11 +63,11 @@ class URYKOT(Document):
             if production_unit_printers:
                 for printer in production_unit_printers:
                     pos_print_flag = False
-                    if printer.custom_block_takeaway_kot == 1:
+                    if printer.block_takeaway_kot == 1:
                         if self.restaurant_table and self.table_takeaway == 0:
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            print_kot(printer.printer, printer.kot_print_format)
                     else:
-                        print_kot(printer.printer, printer.custom_kot_print_format)
+                        print_kot(printer.printer, printer.kot_print_format)
 
                 # Check if restaurant table is specified and it's not a takeaway order
                 if self.restaurant_table and self.table_takeaway == 0:
@@ -79,12 +79,12 @@ class URYKOT(Document):
                         "URY Printer Settings",
                         fields=[
                             "printer",
-                            "custom_kot_print_format",
-                            "custom_kot_print",
+                            "kot_print_format",
+                            "kot_print",
                         ],
                         filters={
                             "parent": room,
-                            "custom_kot_print": 1,
+                            "kot_print": 1,
                             "parenttype": "URY Room",
                         },
                         order_by="idx",
@@ -94,19 +94,19 @@ class URYKOT(Document):
                     if room_kot_printers:
                         for printer in room_kot_printers:
                             pos_print_flag = False
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            print_kot(printer.printer, printer.kot_print_format)
 
                     if pos_print_flag:
                         if pos_kot_printers:
                             for printer in pos_kot_printers:
                                 print_kot(
-                                    printer.printer, printer.custom_kot_print_format
+                                    printer.printer, printer.kot_print_format
                                 )
 
                 else:
                     if pos_kot_printers:
                         for printer in pos_kot_printers:
-                            print_kot(printer.printer, printer.custom_kot_print_format)
+                            print_kot(printer.printer, printer.kot_print_format)
 
     # Function for displaying KOT-related information in real-time On KDS(Kitchen Display System)
     def kotDisplayRealtime(self):
@@ -150,90 +150,39 @@ class URYKOT(Document):
         company, fg_warehouse = frappe.db.get_value(
             "POS Profile", self.pos_profile, ["company", "warehouse"]
         )
+        invoice_type = self.invoice_type
         invoice_id = self.invoice
-        if not invoice_id:
+        if not invoice_id or not invoice_type:
             frappe.throw(_("Cannot process Work Orders without an Invoice ID"))
 
-        all_kots = get_all_kots(invoice_id)
-        existing_wos = get_existing_work_orders(invoice_id)
+        all_kots = get_all_kots(invoice_type, invoice_id)
+        existing_wos = get_existing_work_orders(invoice_type, invoice_id)
         existing_map = {wo.production_item: wo for wo in existing_wos}
 
-        if handle_full_cancellation(all_kots, existing_wos):
-            return
+        item_totals = calculate_item_totals(all_kots)
 
-        replaced_kots = get_replaced_kots(all_kots)
-
-        item_totals = calculate_item_totals(all_kots, replaced_kots)
-
-        sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_id)
+        sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_type, invoice_id)
 
         cleanup_obsolete_work_orders(item_totals, existing_map)
 
 
-def get_all_kots(invoice_id):
+def get_all_kots(invoice_type, invoice_id):
     return frappe.get_all(
         "URY KOT",
-        filters={"invoice": invoice_id},
+        filters={"invoice_type": invoice_type, "invoice": invoice_id},
         fields=["name", "type", "original_kot"],
     )
 
 
-def get_existing_work_orders(invoice_id):
+def get_existing_work_orders(invoice_type, invoice_id):
     return frappe.get_all(
         "Work Order",
-        filters={"pos_invoice": invoice_id},
+        filters={"invoice_type": invoice_type, "invoice": invoice_id},
         fields=["name", "production_item", "qty", "docstatus"],
     )
 
 
-def handle_full_cancellation(all_kots, existing_wos):
-    """
-    If a fully Cancelled KOT exists and matches WO qtys → delete/cancel all WOs.
-    Returns True if all WOs were deleted/cancelled.
-    """
-    cancelled_kot = next((kot for kot in all_kots if kot.type == "Cancelled"), None)
-    if not cancelled_kot:
-        return False
-
-    cancelled_kot_doc = frappe.get_doc("URY KOT", cancelled_kot.name)
-    cancelled_totals = {}
-
-    for item in cancelled_kot_doc.kot_items:
-        item_code = item.item
-        qty = float(item.cancelled_qty or item.quantity or 0)
-        cancelled_totals[item_code] = cancelled_totals.get(item_code, 0) + qty
-
-    wo_totals = {}
-    for wo in existing_wos:
-        wo_totals[wo.production_item] = wo_totals.get(wo.production_item, 0) + float(
-            wo.qty or 0
-        )
-
-    if cancelled_totals == wo_totals:
-        for wo in existing_wos:
-            wo_doc = frappe.get_doc("Work Order", wo.name)
-            if wo_doc.docstatus == 0:
-                wo_doc.delete()
-            else:
-                wo_doc.cancel()
-        return True
-
-    return False
-
-
-def get_replaced_kots(all_kots):
-    """
-    Returns a set of KOT IDs that have been superseded by newer KOTs.
-    """
-    replaced = set()
-    for kot in all_kots:
-        if kot.original_kot:
-            for old_kot in kot.original_kot.split(","):
-                replaced.add(old_kot.strip())
-    return replaced
-
-
-def calculate_item_totals(all_kots, replaced_kots):
+def calculate_item_totals(all_kots):
     """
     Computes total required quantities for each item based on KOTs.
     Handles partial cancellations too.
@@ -241,65 +190,74 @@ def calculate_item_totals(all_kots, replaced_kots):
     item_totals = {}
 
     for kot in all_kots:
-        if kot.name in replaced_kots:
-            continue
-
         kot_doc = frappe.get_doc("URY KOT", kot.name)
-        if kot_doc.type == "Cancelled":
-            continue
+        
+        is_cancellation = kot_doc.type in ["Cancelled", "Partially cancelled"]
 
         for item in kot_doc.kot_items:
             item_code = item.item
-            qty = float(item.quantity or 0)
-            cancelled_qty = float(item.cancelled_qty or 0)
+
+            if is_cancellation:
+                val = flt(item.cancelled_qty or item.quantity or 0)
+            else:
+                val = flt(item.quantity or 0)
 
             if item_code not in item_totals:
-                item_totals[item_code] = 0
+                item_totals[item_code] = 0.0
 
-            if kot_doc.type == "Partially cancelled":
-                item_totals[item_code] += qty - cancelled_qty
+            if is_cancellation:
+                item_totals[item_code] -= val
             else:
-                item_totals[item_code] += qty
+                item_totals[item_code] += val
+
+    # Clean up: Ensure we don't return negative numbers if KOTs are messy
+    for item in list(item_totals.keys()):
+        if item_totals[item] <= 0:
+            item_totals[item] = 0
 
     return item_totals
 
 
-def sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_id):
+def sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_type, invoice_id):
     """
     Creates or updates Work Orders based on calculated item totals.
     """
     for item_code, required_qty in item_totals.items():
+        if required_qty <= 0:
+            if item_code in existing_map:
+                delete_or_cancel_wo(existing_map[item_code].name)
+            continue
+
+
         default_bom = frappe.db.get_value("Item", item_code, "default_bom")
         if not default_bom:
             frappe.throw(_("No active default BOM found for {0}").format(item_code))
 
         if item_code in existing_map:
             wo = existing_map[item_code]
-            wo_doc = frappe.get_doc("Work Order", wo.name)
-
-            if required_qty > 0 and float(wo.qty) != required_qty:
+            if flt(wo.qty) != required_qty:
+                wo_doc = frappe.get_doc("Work Order", wo.name)
                 wo_doc.qty = required_qty
                 wo_doc.set_work_order_operations()
                 wo_doc.save()
-            elif required_qty <= 0:
-                delete_or_cancel_wo(wo.name)
         else:
-            if required_qty > 0:
-                wo_doc = frappe.get_doc(
-                    {
-                        "doctype": "Work Order",
-                        "production_item": item_code,
-                        "bom_no": default_bom,
-                        "qty": required_qty,
-                        "company": company,
-                        "fg_warehouse": fg_warehouse,
-                        "pos_invoice": invoice_id,
-                    }
-                )
-                wo_doc.insert()
-                wo_doc.set_work_order_operations()
-                wo_doc.flags.ignore_mandatory = True
-                wo_doc.save()
+            wo_doc = frappe.get_doc(
+                {
+                    "doctype": "Work Order",
+                    "production_item": item_code,
+                    "bom_no": default_bom,
+                    "qty": required_qty,
+                    "company": company,
+                    "fg_warehouse": fg_warehouse,
+                    "invoice_type": invoice_type,
+                    "invoice": invoice_id,
+                    "is_pos_manufacture": 1,
+                }
+            )
+            wo_doc.insert()
+            wo_doc.set_work_order_operations()
+            wo_doc.flags.ignore_mandatory = True
+            wo_doc.save()
 
 
 def cleanup_obsolete_work_orders(item_totals, existing_map):
@@ -315,11 +273,17 @@ def delete_or_cancel_wo(wo_name):
     """
     Deletes Draft WOs, cancels Submitted WOs.
     """
-    wo_doc = frappe.get_doc("Work Order", wo_name)
-    if wo_doc.docstatus == 0:
-        wo_doc.delete()
-    # else:
-    # 	wo_doc.cancel()
+    if not wo_name or not frappe.db.exists("Work Order", wo_name):
+        return
+    
+    docstatus = frappe.db.get_value("Work Order", wo_name, "docstatus")
+
+    if docstatus == 0:
+        frappe.delete_doc("Work Order", wo_name, ignore_permissions=True)
+    elif docstatus == 1:
+        # wo_doc = frappe.get_doc("Work Order", wo_name)
+        # wo_doc.cancel()
+        pass
 
 
 @frappe.whitelist()
@@ -353,13 +317,13 @@ def on_kot_update(doc, method):
 
     work_orders = frappe.get_all(
         "Work Order",
-        filters={"pos_invoice": doc.invoice},
+        filters={"invoice_type": doc.invoice_type, "invoice": doc.invoice},
         fields=["name", "status", "docstatus"],
     )
 
     if not work_orders:
         frappe.logger().info(
-            f"No Work Orders found for invoice {doc.invoice} (KOT {doc.name})"
+            f"No Work Orders found for invoice {doc.invoice_type} {doc.invoice} (KOT {doc.name})"
         )
         return
 

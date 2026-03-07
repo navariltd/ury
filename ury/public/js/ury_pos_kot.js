@@ -27,6 +27,7 @@ frappe.ui.form.on("POS Invoice", {
     frm.call({
       method: "ury.ury.api.ury_kot_generate.kot_execute",
       args: {
+        invoice_type: frm.doc.doctype,
         invoice_id: invoice_id,
         customer: frm.doc.customer,
         current_items: new_items,
