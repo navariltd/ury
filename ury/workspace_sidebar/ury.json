@@ -48,14 +48,14 @@
    "icon": "door-closed",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Pos Closing Entry",
+   "label": "POS Closing Entry",
    "link_to": "POS Closing Entry",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
   }
  ],
- "modified": "2026-02-22 13:23:16.186792",
+ "modified": "2026-03-07 16:41:03.274375",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "URY",
