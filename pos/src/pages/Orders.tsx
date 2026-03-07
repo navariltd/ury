@@ -124,7 +124,7 @@ export default function Orders() {
       fetchOrders();
     } catch (err) {
       showToast.error(
-        err instanceof Error ? err.message : "Failed to cancel order"
+        err instanceof Error ? err.message : "Failed to cancel order",
       );
     } finally {
       setCancelLoading(false);
@@ -149,7 +149,7 @@ export default function Orders() {
         posStore.setSelectedTable(
           order.restaurant_table,
           order.custom_restaurant_room || null,
-          true
+          true,
         );
       }
       posStore.setSelectedCustomer({
@@ -181,7 +181,7 @@ export default function Orders() {
       navigate("/");
     } catch (err) {
       showToast.error(
-        err instanceof Error ? err.message : "Failed to edit order"
+        err instanceof Error ? err.message : "Failed to edit order",
       );
     } finally {
       setEditLoading(false);
@@ -192,16 +192,13 @@ export default function Orders() {
     if (!selectedOrder || !posStore.posProfile) return;
     setIsPrinting(true);
     try {
-      const res = await call.post(
-        "ury.ury.api.ury_print.print_pos_invoice",
-        {
-          doctype: "POS Invoice",
-          name: selectedOrder.name,
-          format_name: posStore.posProfile?.print_format || "POS Invoice",
-          letter_head: posStore.posProfile?.letter_head || "",
-          no_letterhead: 0,
-        }
-      )
+      const res = await call.post("ury.ury.api.ury_print.print_pos_invoice", {
+        doctype: "POS Invoice",
+        name: selectedOrder.name,
+        format_name: posStore.posProfile?.print_format || "POS Invoice",
+        letter_head: posStore.posProfile?.letter_head || "",
+        no_letterhead: 0,
+      });
 
       // Create a hidden iframe for printing
       const printFrame = document.createElement("iframe");
@@ -224,7 +221,7 @@ export default function Orders() {
         printFrame.contentWindow?.print();
 
         setTimeout(() => document.body.removeChild(printFrame), 2000);
-      }
+      };
 
       // Update backend to mark invoice as printed
       await call.post("frappe.client.set_value", {
@@ -264,7 +261,7 @@ export default function Orders() {
   }
 
   return (
-    <div className='flex h-screen overflow-hidden'>
+    <div className='flex flex-col lg:flex-row h-full lg:h-screen overflow-hidden'>
       {/* Left Sidebar - Order Types */}
       <OrderStatusSidebar
         selectedStatus={selectedStatus}
@@ -272,8 +269,8 @@ export default function Orders() {
       />
 
       {/* Middle Section - Order Cards */}
-      <div className='flex-1 flex flex-col h-screen overflow-hidden pr-96'>
-        <div className='flex-1 overflow-y-auto bg-gray-50 p-4 pb-40'>
+      <div className='flex-1 flex flex-col overflow-hidden lg:pr-96'>
+        <div className='flex-1 overflow-y-auto bg-gray-50 p-2 lg:p-4 pb-40'>
           {orderLoading ? (
             <div className='flex items-center justify-center h-full'>
               <Spinner />
@@ -283,7 +280,7 @@ export default function Orders() {
               <p className='text-gray-500'>No orders found</p>
             </div>
           ) : (
-            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-screen-xl mx-auto'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 max-w-screen-xl mx-auto'>
               {orders.map((order) => (
                 <Card
                   key={order.name}
@@ -333,7 +330,7 @@ export default function Orders() {
                         <span>
                           {formatDateTime(
                             order.posting_date,
-                            order.posting_time
+                            order.posting_time,
                           )}
                         </span>
                       </div>
@@ -389,7 +386,20 @@ export default function Orders() {
       </div>
 
       {/* Right Section - Order Details */}
-      <div className='w-96 bg-white border-l border-gray-200 flex flex-col h-[calc(100vh-4rem)] fixed right-0 z-10'>
+      <div
+        className={`w-full lg:w-96 bg-white border-l border-gray-200 flex flex-col fixed inset-0 lg:inset-auto lg:right-0 lg:h-[calc(100vh-4rem)] z-50 ${!selectedOrder ? "hidden lg:flex" : ""}`}
+      >
+        {/* Mobile Close Button */}
+        {selectedOrder && (
+          <button
+            onClick={() => clearSelectedOrder()}
+            className='lg:hidden absolute top-4 right-4 p-2 bg-gray-100 hover:bg-gray-200 rounded-full z-50'
+            aria-label='Close order details'
+          >
+            <X className='w-5 h-5' />
+          </button>
+        )}
+
         {!selectedOrder ? (
           <div className='text-center h-full flex flex-col items-center justify-center text-gray-500 p-6'>
             <p className='text-lg font-medium mb-2'>
@@ -413,8 +423,8 @@ export default function Orders() {
         ) : (
           <>
             {/* Fixed Header */}
-            <div className='sticky top-0 left-0 right-0 z-20 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between min-h-[64px]'>
-              <h2 className='text-xl font-semibold text-gray-900 truncate max-w-[10rem]'>
+            <div className='sticky top-0 left-0 right-0 z-20 bg-white border-b border-gray-200 px-4 lg:px-6 py-4 flex items-center justify-between min-h-[64px] pt-16 lg:pt-4'>
+              <h2 className='text-xl font-semibold text-gray-900 truncate max-w-[10rem] lg:max-w-none'>
                 {selectedOrder.name}
               </h2>
               <div className='flex items-center gap-2'>
@@ -505,7 +515,7 @@ export default function Orders() {
                       <span className='text-gray-600'>
                         {formatDateTime(
                           selectedOrder.posting_date,
-                          selectedOrder.posting_time
+                          selectedOrder.posting_time,
                         )}
                       </span>
                     </div>
@@ -587,16 +597,16 @@ export default function Orders() {
               <div className='flex items-center gap-3 w-full'>
                 {/* Print Icon Button */}
                 <Button
-                  size="icon"
-                  className="flex-shrink-0 bg-blue-100 hover:bg-blue-200 text-blue-700"
+                  size='icon'
+                  className='flex-shrink-0 bg-blue-100 hover:bg-blue-200 text-blue-700'
                   onClick={handlePrintOrder}
-                  aria-label="Print"
+                  aria-label='Print'
                   disabled={isPrinting}
-                  >
+                >
                   {isPrinting ? (
-                    <Spinner className="w-5 h-5" hideMessage />
+                    <Spinner className='w-5 h-5' hideMessage />
                   ) : (
-                    <Printer className="w-5 h-5" />
+                    <Printer className='w-5 h-5' />
                   )}
                 </Button>
                 {/* Payment Button - Only show for Draft, Unbilled, and Recently Paid orders */}
@@ -608,9 +618,10 @@ export default function Orders() {
                     onClick={() => {
                       if (
                         posStore.posProfile?.require_invoice_printing &&
-                        String(selectedOrder.invoice_printed) === "0") {
+                        String(selectedOrder.invoice_printed) === "0"
+                      ) {
                         showToast.error(
-                          "Please print invoice before making payment"
+                          "Please print invoice before making payment",
                         );
                         return;
                       }
