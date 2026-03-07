@@ -158,9 +158,6 @@ class URYKOT(Document):
         existing_wos = get_existing_work_orders(invoice_id)
         existing_map = {wo.production_item: wo for wo in existing_wos}
 
-        if handle_full_cancellation(all_kots, existing_wos):
-            return
-
         item_totals = calculate_item_totals(all_kots)
 
         sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_id)
@@ -182,41 +179,6 @@ def get_existing_work_orders(invoice_id):
         filters={"pos_invoice": invoice_id},
         fields=["name", "production_item", "qty", "docstatus"],
     )
-
-
-def handle_full_cancellation(all_kots, existing_wos):
-    """
-    If a fully Cancelled KOT exists and matches WO qtys → delete/cancel all WOs.
-    Returns True if all WOs were deleted/cancelled.
-    """
-    cancelled_kot = next((kot for kot in all_kots if kot.type == "Cancelled"), None)
-    if not cancelled_kot:
-        return False
-
-    cancelled_kot_doc = frappe.get_doc("URY KOT", cancelled_kot.name)
-    cancelled_totals = {}
-
-    for item in cancelled_kot_doc.kot_items:
-        item_code = item.item
-        qty = flt(item.cancelled_qty or item.quantity or 0)
-        cancelled_totals[item_code] = cancelled_totals.get(item_code, 0) + qty
-
-    wo_totals = {}
-    for wo in existing_wos:
-        wo_totals[wo.production_item] = wo_totals.get(wo.production_item, 0) + flt(
-            wo.qty or 0
-        )
-
-    if cancelled_totals == wo_totals:
-        for wo in existing_wos:
-            wo_doc = frappe.get_doc("Work Order", wo.name)
-            if wo_doc.docstatus == 0:
-                wo_doc.delete()
-            else:
-                wo_doc.cancel()
-        return True
-
-    return False
 
 
 def calculate_item_totals(all_kots):
