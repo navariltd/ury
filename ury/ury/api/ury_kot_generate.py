@@ -161,6 +161,7 @@ def process_items_for_kot(
                 invoice_exist = frappe.db.exists(
                     "URY KOT",
                     {
+                        "invoice_type": invoice_type,
                         "invoice": invoice_id,
                         "docstatus": 1,
                         "production": production.name,
@@ -257,6 +258,7 @@ def create_cancel_kot_doc(
     kot_list = frappe.db.get_list(
         "URY KOT",
         filters={
+            "invoice_type": invoice_type,
             "invoice": invoice_id,
             "type": ("in", ("New Order", "Order Modified")),
         },
@@ -288,6 +290,7 @@ def create_cancel_kot_doc(
             "restaurant_table": restaurant_table,
             "customer_name": customer,
             "type": kot_type,
+            "invoice_type": invoice_type,
             "invoice": invoice_id,
             "pos_profile": pos_profile_id,
             "comments": comments,
