@@ -7,7 +7,7 @@ import frappe
 from erpnext.manufacturing.doctype.work_order.work_order import make_stock_entry
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import get_datetime, now
+from frappe.utils import get_datetime, now, flt
 from frappe.utils.print_format import print_by_server
 
 
@@ -161,9 +161,7 @@ class URYKOT(Document):
         if handle_full_cancellation(all_kots, existing_wos):
             return
 
-        replaced_kots = get_replaced_kots(all_kots)
-
-        item_totals = calculate_item_totals(all_kots, replaced_kots)
+        item_totals = calculate_item_totals(all_kots)
 
         sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_id)
 
@@ -200,12 +198,12 @@ def handle_full_cancellation(all_kots, existing_wos):
 
     for item in cancelled_kot_doc.kot_items:
         item_code = item.item
-        qty = float(item.cancelled_qty or item.quantity or 0)
+        qty = flt(item.cancelled_qty or item.quantity or 0)
         cancelled_totals[item_code] = cancelled_totals.get(item_code, 0) + qty
 
     wo_totals = {}
     for wo in existing_wos:
-        wo_totals[wo.production_item] = wo_totals.get(wo.production_item, 0) + float(
+        wo_totals[wo.production_item] = wo_totals.get(wo.production_item, 0) + flt(
             wo.qty or 0
         )
 
@@ -221,19 +219,7 @@ def handle_full_cancellation(all_kots, existing_wos):
     return False
 
 
-def get_replaced_kots(all_kots):
-    """
-    Returns a set of KOT IDs that have been superseded by newer KOTs.
-    """
-    replaced = set()
-    for kot in all_kots:
-        if kot.original_kot:
-            for old_kot in kot.original_kot.split(","):
-                replaced.add(old_kot.strip())
-    return replaced
-
-
-def calculate_item_totals(all_kots, replaced_kots):
+def calculate_item_totals(all_kots):
     """
     Computes total required quantities for each item based on KOTs.
     Handles partial cancellations too.
@@ -241,25 +227,30 @@ def calculate_item_totals(all_kots, replaced_kots):
     item_totals = {}
 
     for kot in all_kots:
-        if kot.name in replaced_kots:
-            continue
-
         kot_doc = frappe.get_doc("URY KOT", kot.name)
-        if kot_doc.type == "Cancelled":
-            continue
+
+        is_cancellation = kot_doc.type in ["Cancelled", "Partially cancelled"]
 
         for item in kot_doc.kot_items:
             item_code = item.item
-            qty = float(item.quantity or 0)
-            cancelled_qty = float(item.cancelled_qty or 0)
+
+            if is_cancellation:
+                val = flt(item.cancelled_qty or item.quantity or 0)
+            else:
+                val = flt(item.quantity or 0)
 
             if item_code not in item_totals:
-                item_totals[item_code] = 0
+                item_totals[item_code] = 0.0
 
-            if kot_doc.type == "Partially cancelled":
-                item_totals[item_code] += qty - cancelled_qty
+            if is_cancellation:
+                item_totals[item_code] -= val
             else:
-                item_totals[item_code] += qty
+                item_totals[item_code] += val
+    
+    # Clean up: Ensure we don't return negative numbers if KOTs are messy
+    for item in list(item_totals.keys()):
+        if item_totals[item] <= 0:
+            item_totals[item] = 0
 
     return item_totals
 
@@ -269,37 +260,39 @@ def sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_i
     Creates or updates Work Orders based on calculated item totals.
     """
     for item_code, required_qty in item_totals.items():
+        if required_qty <= 0:
+            if item_code in existing_map:
+                delete_or_cancel_wo(existing_map[item_code].name)
+            continue
+
+
         default_bom = frappe.db.get_value("Item", item_code, "default_bom")
         if not default_bom:
             frappe.throw(_("No active default BOM found for {0}").format(item_code))
 
         if item_code in existing_map:
             wo = existing_map[item_code]
-            wo_doc = frappe.get_doc("Work Order", wo.name)
-
-            if required_qty > 0 and float(wo.qty) != required_qty:
+            if flt(wo.qty) != required_qty:
+                wo_doc = frappe.get_doc("Work Order", wo.name)
                 wo_doc.qty = required_qty
                 wo_doc.set_work_order_operations()
                 wo_doc.save()
-            elif required_qty <= 0:
-                delete_or_cancel_wo(wo.name)
         else:
-            if required_qty > 0:
-                wo_doc = frappe.get_doc(
-                    {
-                        "doctype": "Work Order",
-                        "production_item": item_code,
-                        "bom_no": default_bom,
-                        "qty": required_qty,
-                        "company": company,
-                        "fg_warehouse": fg_warehouse,
-                        "pos_invoice": invoice_id,
-                    }
-                )
-                wo_doc.insert()
-                wo_doc.set_work_order_operations()
-                wo_doc.flags.ignore_mandatory = True
-                wo_doc.save()
+            wo_doc = frappe.get_doc(
+                {
+                    "doctype": "Work Order",
+                    "production_item": item_code,
+                    "bom_no": default_bom,
+                    "qty": required_qty,
+                    "company": company,
+                    "fg_warehouse": fg_warehouse,
+                    "pos_invoice": invoice_id,
+                }
+            )
+            wo_doc.insert()
+            wo_doc.set_work_order_operations()
+            wo_doc.flags.ignore_mandatory = True
+            wo_doc.save()
 
 
 def cleanup_obsolete_work_orders(item_totals, existing_map):
@@ -315,11 +308,17 @@ def delete_or_cancel_wo(wo_name):
     """
     Deletes Draft WOs, cancels Submitted WOs.
     """
-    wo_doc = frappe.get_doc("Work Order", wo_name)
-    if wo_doc.docstatus == 0:
-        wo_doc.delete()
-    # else:
-    # 	wo_doc.cancel()
+    if not wo_name or not frappe.db.exists("Work Order", wo_name):
+        return
+    
+    docstatus = frappe.db.get_value("Work Order", wo_name, "docstatus")
+
+    if docstatus == 0:
+        frappe.delete_doc("Work Order", wo_name, ignore_permissions=True)
+    elif docstatus == 1:
+        # wo_doc = frappe.get_doc("Work Order", wo_name)
+        # wo_doc.cancel()
+        pass
 
 
 @frappe.whitelist()
