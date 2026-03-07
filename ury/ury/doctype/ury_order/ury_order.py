@@ -559,7 +559,6 @@ def cancel_order(invoice_id, reason):
     except Exception as e:
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
         frappe.log_error(message=f"KOT Cancellation Error: {e}", title="KOT Cancellation Error")
-        pass
 
     # Update invoice status
     frappe.db.sql(
