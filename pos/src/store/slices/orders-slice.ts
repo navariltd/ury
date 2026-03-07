@@ -5,6 +5,7 @@ import { getPOSInvoices, getPOSInvoiceItems, POSInvoiceItem, POSInvoiceTax, getA
 import { searchPosInvoice } from '../../lib/invoice-api';
 
 export interface POSInvoice {
+  doctype: string,
   name: string;
   invoice_printed: number;
   grand_total: number;

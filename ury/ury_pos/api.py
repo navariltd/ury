@@ -827,7 +827,7 @@ def getAllOrders(limit, limit_start):
 	invoices = frappe.db.sql(
 		f"""
         SELECT
-            pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+            pi.name, '{invoice_type}' as doctype, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
             pi.cashier, pi.waiter, u.full_name as waiter_name, pi.net_total, pi.posting_time,
             pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
             pi.posting_date, pi.rounded_total, pi.order_type
