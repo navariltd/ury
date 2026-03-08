@@ -243,9 +243,19 @@ export const usePOSStore = create<POSStore>((set, get) => ({
           posProfile: profile, 
           profileLoading: false,
           currency: profile.currency || 'INR',
-          defaultCustomer: null,
-          selectedCustomer: null,
         });
+
+        // If default customer isn't set yet, fetch it even when cached
+        if (!get().defaultCustomer && profile.customer) {
+          const defaultCustomer = await getDefaultCustomerFromProfile(profile);
+          const customerData = defaultCustomer ? {
+            id: defaultCustomer.name,
+            name: defaultCustomer.customer_name,
+            phone: defaultCustomer.mobile_number,
+          } : null;
+          set({ defaultCustomer: customerData, selectedCustomer: customerData});
+        }
+
         if (!storage.getItem('currencySymbol')) {
           await get().fetchCurrencySymbol();
         }
@@ -689,7 +699,7 @@ export const usePOSStore = create<POSStore>((set, get) => ({
     const { fetchMenuItems, defaultCustomer } = get();
     
     set({
-      selectedCustomer: defaultCustomer || null,
+      selectedCustomer: defaultCustomer,
       selectedTable: null,
       selectedRoom: null,
       selectedAggregator: null,

@@ -20,22 +20,24 @@ class URYOrder(Document):
 def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=None):
     """returns the active invoice linked to the given table"""
 
+    invoice_type = frappe.get_single_value("POS Settings", "invoice_type")
+
     if table:
         if is_payment == "Payments":
             invoice_name = frappe.get_value(
-                "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
+                invoice_type, dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
 
         else:
             if invoiceNo:
                 invoice_name = frappe.get_value(
-                    "POS Invoice",
+                    invoice_type,
                     dict(restaurant_table=table, docstatus=0, name=invoiceNo),
                 )
 
             else:
                 invoice_name = frappe.get_value(
-                    "POS Invoice",
+                    invoice_type,
                     dict(restaurant_table=table, docstatus=0, invoice_printed=0),
                 )
 
@@ -43,10 +45,10 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
         branch, menu_name, restaurant = get_restaurant_and_menu_name(table)
 
         if invoice_name:
-            invoice = frappe.get_doc("POS Invoice", invoice_name)
+            invoice = frappe.get_doc(invoice_type, invoice_name)
 
         else:
-            invoice = frappe.new_doc("POS Invoice")
+            invoice = frappe.new_doc(invoice_type)
 
             invoice.naming_series = frappe.db.get_value(
                 "URY Restaurant", restaurant, "invoice_series_prefix"
@@ -74,19 +76,19 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
     else:
         if is_payment == "Payments":
             invoice_name = frappe.get_value(
-                "POS Invoice", dict(restaurant_table=table, docstatus=0, name=invoiceNo)
+                invoice_type, dict(restaurant_table=table, docstatus=0, name=invoiceNo)
             )
 
         else:
             invoice_name = frappe.get_value(
-                "POS Invoice", dict(docstatus=0, name=invoiceNo)
+                invoice_type, dict(docstatus=0, name=invoiceNo)
             )
 
         if invoice_name:
-            invoice = frappe.get_doc("POS Invoice", invoice_name)
+            invoice = frappe.get_doc(invoice_type, invoice_name)
 
         else:
-            invoice = frappe.new_doc("POS Invoice")
+            invoice = frappe.new_doc(invoice_type)
             invoice.is_pos = 1
             invoice.update_stock = 1
 
@@ -131,15 +133,16 @@ def sync_order(
 ):
     user_role = frappe.get_roles()
     posprofile = frappe.get_doc("POS Profile", pos_profile)
-
     billing_user = any(
         role.role in user_role for role in posprofile.role_allowed_for_billing
     )
 
+    invoice_type = frappe.get_single_value("POS Settings", "invoice_type")
+
     # Check if the last invoice was already billed
     if (
         last_invoice
-        and frappe.db.get_value("POS Invoice", last_invoice, "invoice_printed") == 1
+        and frappe.db.get_value(invoice_type, last_invoice, "invoice_printed") == 1
         and (not billing_user)
     ):
         frappe.msgprint(
@@ -212,6 +215,9 @@ def sync_order(
     invoice.custom_aggregator_id = aggregator_id
     invoice.custom_restaurant_room = room
     invoice.restaurant_table = table
+
+    if invoice_type == "Sales Invoice":
+        invoice.is_created_using_pos = 1
 
     if order_type == "Aggregators":
         price_list = frappe.db.get_value(
@@ -298,12 +304,12 @@ def sync_order(
         frappe.throw(f"Error while updating order: {e}")
 
     try:
-        kot_execute(invoice.name, customer, table, items, past_item, comments)
+        kot_execute(invoice_type, invoice.name, customer, table, items, past_item, comments)
 
     except Exception as e:
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without affect the code execution.
-        error_msg = f"KOT Creation Failes {str(e)}"
-        frappe.log_error(error_msg, "KOT Error")
+        error_msg = f"KOT Creation Failed {str(e)}"
+        frappe.log_error(title="KOT Error", message=error_msg)
 
     # table status
     if invoice.invoice_printed == 0:
@@ -543,7 +549,8 @@ def customer_favourite_item(customer_name):
 
 @frappe.whitelist()
 def cancel_order(invoice_id, reason):
-    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
+    invoice_type = frappe.get_single_value("POS Settings", "invoice_type")
+    pos_invoice = frappe.get_doc(invoice_type, invoice_id)
 
     # Update table status
     if pos_invoice.restaurant_table:
@@ -554,7 +561,7 @@ def cancel_order(invoice_id, reason):
         )
 
     try:
-        cancel_kot(invoice_id)
+        cancel_kot(invoice_type, invoice_id)
 
     except Exception as e:
         # If an exception occurs (e.g., "kot" app not found), it will be caught here without effecting execution
@@ -562,17 +569,17 @@ def cancel_order(invoice_id, reason):
 
     # Update invoice status
     frappe.db.sql(
-        """
-        UPDATE `tabPOS Invoice Item`
+        f"""
+        UPDATE `tab{invoice_type} Item`
         SET docstatus = 2
-        WHERE parent = %s
+        WHERE parent = %s AND parenttype = %s
     """,
-        (invoice_id,),
+        (invoice_id, invoice_type),
     )
 
-    frappe.db.set_value("POS Invoice", invoice_id, "docstatus", 2)
-    frappe.db.set_value("POS Invoice", invoice_id, "status", "Cancelled")
-    frappe.db.set_value("POS Invoice", invoice_id, "cancel_reason", reason)
+    frappe.db.set_value(invoice_type, invoice_id, "docstatus", 2)
+    frappe.db.set_value(invoice_type, invoice_id, "status", "Cancelled")
+    frappe.db.set_value(invoice_type, invoice_id, "cancel_reason", reason)
 
 
 # Method for URY POS
@@ -588,7 +595,8 @@ def make_invoice(
     invoice=None,
 ):
     # Always fetch existing draft invoice
-    order_type = frappe.get_value("POS Invoice", invoice, "order_type")
+    invoice_type = frappe.get_single_value("POS Settings", "invoice_type")
+    order_type = frappe.get_value(invoice_type, invoice, "order_type")
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
 
     if table:
@@ -623,31 +631,32 @@ def make_invoice(
 
 
 # Cancel KOT Doc Creation
-def cancel_kot(invoice_id):
-    pos_invoice = frappe.get_doc("POS Invoice", invoice_id)
-    pos_profile_id = pos_invoice.pos_profile
+def cancel_kot(invoice_type, invoice_id):
+    invoice = frappe.get_doc(invoice_type, invoice_id)
+    pos_profile_id = invoice.pos_profile
     pos_profile = frappe.get_doc("POS Profile", pos_profile_id)
     kot_naming_series = pos_profile.custom_kot_naming_series
     cancel_kot_naming_series = "CNCL-" + kot_naming_series
 
     items = []
     # Create a list of items for the canceled KOT
-    for item in pos_invoice.items:
+    for item in invoice.items:
         items.append({
             "item_code": item.get("item", item.get("item_code")),
             "qty": item.qty,
             "item_name": item.item_name,
         })
 
-    if pos_invoice.restaurant_table:
-        restaurant_table = pos_invoice.restaurant_table
+    if invoice.restaurant_table:
+        restaurant_table = invoice.restaurant_table
     else:
         restaurant_table = None
 
     # Process items for a canceled KOT
     process_items_for_cancel_kot(
+        invoice_type,
         invoice_id,
-        pos_invoice.customer,
+        invoice.customer,
         restaurant_table,
         items,
         "",

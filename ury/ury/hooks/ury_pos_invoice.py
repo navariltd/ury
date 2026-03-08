@@ -37,6 +37,14 @@ class URYPOSInvoice(POSInvoice):
         self.validate_invoice_print()
         self.ro_reload_submit()
 
+    def on_submit(self):
+        super().on_submit()
+        self.invalidate_pos_stock_cache()
+
+    def on_cancel(self):
+        super().on_cancel()
+        self.invalidate_pos_stock_cache
+
     def on_trash(self):
         self.table_status_delete()
 
@@ -487,7 +495,7 @@ class URYPOSInvoice(POSInvoice):
 
         work_orders = frappe.get_all(
             "Work Order",
-            filters={"pos_invoice": self.name},
+            filters={"invoice_type": "POS Invoice", "invoice": self.name},
             fields=["name", "status", "docstatus", "qty", "produced_qty"],
         )
 
@@ -609,7 +617,7 @@ class URYPOSInvoice(POSInvoice):
             kot_doc.save(ignore_permissions=True)
 
         kots = frappe.get_all(
-            "URY KOT", filters={"invoice": self.name}, fields=["name"]
+            "URY KOT", filters={"invoice_type": "POS Invoice", "invoice": self.name}, fields=["name"]
         )
 
         for kot in kots:
@@ -623,3 +631,15 @@ class URYPOSInvoice(POSInvoice):
                 "Some Work Orders could not be completed:\n\n" + "\n".join(failed),
                 title="Auto Manufacture Errors",
             )
+
+    def invalidate_pos_stock_cache(self):
+        """
+        Clears the Redis cache for each item in this invoice
+        to ensure the POS shows updated stock levels.
+        """
+        if not self.items:
+            return
+        
+        for item in self.items:
+            cache_key = f"item_stock:{item.warehouse}:{item.item_code}"
+            frappe.cache().delete_value(cache_key)
