@@ -59,7 +59,6 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 	Raises:
 	    frappe.ValidationError: If no active menu is set for the restaurant.
 	"""
-	menu_items = []
 	user_role = frappe.get_roles()
 	pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
 
@@ -67,6 +66,7 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 	branch_name = getBranch()
 	restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
 
+	menu = None
 	if cashier and order_type:
 		order_type_wise_menu = frappe.db.get_value("URY Restaurant", restaurant, "order_type_wise_menu")
 
@@ -76,93 +76,98 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 				{"parent": restaurant, "order_type": order_type},
 				"menu",
 			)
-			if not menu:
-				menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
-		else:
-			menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-
-	elif room:
+	if not menu and room:
 		room_wise_menu = frappe.db.get_value("URY Restaurant", restaurant, "room_wise_menu")
 
 		if room_wise_menu:
 			menu = frappe.db.get_value("Menu for Room", {"parent": restaurant, "room": room}, "menu")
-			if not menu:
-				menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
-		else:
-			menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
-	# Default menu if nothing is selected
-	else:
+	if not menu:
 		menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
 	if not menu:
 		frappe.throw(_("Please set an active menu for Restaurant {0}").format(restaurant))
 
+	# --- Caching Logic ---
+	# Cache the list of items to avoid heavy SQL Join every time.
+	menu_structure_cache_key = f"rest_menu_items:{menu}"
+	menu_items = frappe.cache().get_value(menu_structure_cache_key)
+
+	if not menu_items:
+		# Cache Miss: Run the SQL query
+		menu_items = (
+			frappe.qb.from_(UMI)
+			.join(IT)
+			.on(UMI.item == IT.name)
+			.select(
+				UMI.item,
+				UMI.item_name,
+				UMI.rate,
+				UMI.special_dish,
+				UMI.disabled,
+				UMI.course,
+				IT.image.as_("item_image"),
+				IT.item_code.as_("item_code"),
+				IT.default_bom,
+				IT.item_group,
+			)
+			.where(UMI.parent == menu)
+			.where(UMI.disabled == 0)
+			.where(IT.disabled == 0)
+		).run(as_dict=True)
+
+		# Store the menu structure for 24 hours
+		frappe.cache().set_value(menu_structure_cache_key, menu_items, expires_in_sec=86400)
+
 	# Get QSR item groups for this POS Profile
 	qsr_item_groups = get_qsr_item_groups(pos_profile)
+	warehouse = pos_profile_doc.warehouse
+	filtered_menu_items = []
 
-	menu_items_query = (
-		frappe.qb.from_(UMI)
-		.join(IT)
-		.on(UMI.item == IT.name)
-		.select(
-			UMI.item,
-			UMI.item_name,
-			UMI.rate,
-			UMI.special_dish,
-			UMI.disabled,
-			UMI.course,
-			IT.image.as_("item_image"),
-			IT.item_code.as_("item_code"),
-			IT.default_bom,
-			IT.item_group,
-		)
-		.where(UMI.parent == menu)
-		.where(UMI.disabled == 0)
-		.where(IT.disabled == 0)
-	)
-
-	menu_items = menu_items_query.run(as_dict=True)
-
-	menu_items_with_stock_count = []
 	for item in menu_items:
 		# Check if item belongs to QSR item groups
 		if item.item_group in qsr_item_groups:
 			stock_balance = "QSR"
 		else:
 			# Check stock only if item does not have a BOM
-			stock_balance = get_stock_availability(item.item_code, pos_profile_doc.warehouse)[0]
+			stock_cache_key = f"item_stock:{warehouse}:{item.item_code}"
+			stock_balance = frappe.cache().get_value(stock_cache_key)
 
-		menu_items_with_stock_count.append(
-			{
-				"item": item.item,
-				"item_name": item.item_name,
-				"rate": item.rate,
-				"special_dish": item.special_dish,
-				"disabled": item.disabled,
-				"item_image": item.item_image,
-				"course": item.course,
-				"stock_balance": stock_balance,
-			}
-		)
+			if stock_balance is None:
+				# Cache Miss: Calculate stock and save for 1 hour
+				stock_balance = get_stock_availability(item.item_code, pos_profile_doc.warehouse)[0]
+				frappe.cache().set_value(stock_cache_key, stock_balance, expires_in_sec=3600)
 
-	filtered_menu_items = []
+		is_available = (stock_balance == "QSR" or stock_balance is None or stock_balance > 0)
 
-	# if pos_profile.hide_unavailable_items hide items with zero stock
-	if pos_profile_doc.hide_unavailable_items:
-		# Filter out items with zero stock, but keep QSR items
-		filtered_menu_items = [
-			item
-			for item in menu_items_with_stock_count
-			if item["stock_balance"] == "QSR" or item["stock_balance"] is None or item["stock_balance"] > 0
-		]
-	else:
-		filtered_menu_items = menu_items_with_stock_count
+		if pos_profile_doc.hide_unavailable_items:
+			if is_available:
+				item_data = item.copy()
+				item_data["stock_balance"] = stock_balance
+				filtered_menu_items.append(item_data)
+
+		else:
+			item_data = item.copy()
+			item_data["stock_balance"] = stock_balance
+			filtered_menu_items.append(item_data)
 
 	modified = frappe.db.get_value("URY Menu", menu, "modified")
 
 	return {"items": filtered_menu_items, "modified_time": modified, "name": menu}
+
+
+@frappe.whitelist()
+def invalidate_item_stock_cache(item_code, warehouse):
+    """Call this when a sale is made to force a stock refresh"""
+    frappe.cache().delete_value(f"item_stock:{warehouse}:{item_code}")
+
+@frappe.whitelist()
+def clear_all_pos_cache():
+    """Wipes all menu and stock cache"""
+    frappe.cache().delete_keys("rest_menu_items:")
+    frappe.cache().delete_keys("item_stock:")
+    return True
 
 
 def get_qsr_item_groups(pos_profile):
