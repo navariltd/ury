@@ -100,6 +100,14 @@ class URYSalesInvoice(SalesInvoice):
 		self.validate_invoice_print()
 		self.ro_reload_submit()
 
+	def on_submit(self):
+		super().on_submit()
+		self.invalidate_pos_stock_cache()
+
+	def on_cancel(self):
+		super().on_cancel()
+		self.invalidate_pos_stock_cache
+
 	def on_trash(self):
 		self.table_status_delete()
 
@@ -591,3 +599,16 @@ class URYSalesInvoice(SalesInvoice):
 				"Some Work Orders could not be completed:\n\n" + "\n".join(failed),
 				title="Auto Manufacture Errors",
 			)
+
+
+	def invalidate_pos_stock_cache(self):
+		"""
+		Clears the Redis cache for each item in this invoice
+		to ensure the POS shows updated stock levels.
+		"""
+		if not self.items:
+			return
+		
+		for item in self.items:
+			cache_key = f"item_stock:{item.warehouse}:{item.item_code}"
+			frappe.cache().delete_value(cache_key)
