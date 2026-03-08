@@ -191,7 +191,7 @@ def calculate_item_totals(all_kots):
 
     for kot in all_kots:
         kot_doc = frappe.get_doc("URY KOT", kot.name)
-        
+
         is_cancellation = kot_doc.type in ["Cancelled", "Partially cancelled"]
 
         for item in kot_doc.kot_items:

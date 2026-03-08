@@ -553,11 +553,12 @@ def cancel_order(invoice_id, reason):
     pos_invoice = frappe.get_doc(invoice_type, invoice_id)
 
     # Update table status
-    frappe.db.set_value(
-        "URY Table",
-        pos_invoice.restaurant_table,
-        {"occupied": 0, "latest_invoice_time": None},
-    )
+    if pos_invoice.restaurant_table:
+        frappe.db.set_value(
+            "URY Table",
+            pos_invoice.restaurant_table,
+            {"occupied": 0, "latest_invoice_time": None},
+        )
 
     try:
         cancel_kot(invoice_type, invoice_id)
