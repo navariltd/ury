@@ -14,6 +14,7 @@ import { useRootStore } from "../store/root-store";
 import { usePOSStore } from "../store/pos-store";
 import type { RootState } from "../store/root-store";
 import { logout } from "../lib/auth-api";
+import { call } from "../lib/frappe-sdk";
 import { showToast } from "./ui/toast";
 import POSClosingDialog from "./POSClosingDialog";
 
@@ -101,13 +102,20 @@ const Header = () => {
     }
   };
 
-  const handleClearCache = () => {
-    // Clear all local storage
-    localStorage.clear();
-    // Clear all session storage
-    sessionStorage.clear();
-    // Reload the page
-    window.location.reload();
+  const handleClearCache = async () => {
+    try {
+      await call.get("ury.ury_pos.api.clear_all_pos_cache")
+    } catch (error) {
+      console.error("Failed to clear server cache", error);
+      showToast.error("Partial cache clear. Some server data may remain.");
+    } finally {
+      // Clear all local storage
+      localStorage.clear();
+      // Clear all session storage
+      sessionStorage.clear();
+      // Reload the page
+      window.location.reload();
+    }
   };
 
   return (
