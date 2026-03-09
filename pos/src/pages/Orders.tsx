@@ -193,7 +193,7 @@ export default function Orders() {
     setIsPrinting(true);
     try {
       const res = await call.post("ury.ury.api.ury_print.print_pos_invoice", {
-        doctype: "POS Invoice",
+        doctype: selectedOrder.doctype,
         name: selectedOrder.name,
         format_name: posStore.posProfile?.print_format || "POS Invoice",
         letter_head: posStore.posProfile?.letter_head || "",
