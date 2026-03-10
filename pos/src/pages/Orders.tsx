@@ -225,7 +225,7 @@ export default function Orders() {
 
       // Update backend to mark invoice as printed
       await call.post("frappe.client.set_value", {
-        doctype: "POS Invoice",
+        doctype: selectedOrder.doctype,
         name: selectedOrder.name,
         fieldname: "invoice_printed",
         value: 1,
