@@ -80,7 +80,8 @@ def remove_tax(doc, method):
 
 class URYSalesInvoice(SalesInvoice):
 	def before_insert(self):
-		self.pos_invoice_naming()
+		if self.pos_profile:
+			self.pos_invoice_naming()
 		self.order_type_update()
 		self.restrict_existing_order()
 
@@ -370,15 +371,41 @@ class URYSalesInvoice(SalesInvoice):
 			)
 
 	def pos_invoice_naming(self):
-		pos_profile = frappe.get_doc("POS Profile", self.pos_profile)
-		restaurant = pos_profile.restaurant
+		if not self.is_pos:
+			return
 
-		if not self.restaurant_table:
-			self.naming_series = frappe.db.get_value("URY Restaurant", restaurant, "invoice_series_prefix")
+		if not self.pos_profile:
+			return
 
+		pos_profile = frappe.db.get_value(
+			"POS Profile", self.pos_profile, ["restaurant_prefix", "restaurant"], as_dict=True
+		)
+
+		if not pos_profile:
+			frappe.throw(f"POS Profile '{self.pos_profile}' does not exist. Please select a valid POS Profile.")
+
+		restaurant = pos_profile.get("restaurant")
+
+		if pos_profile.get("restaurant_prefix") == 1 and restaurant:
 			if self.order_type == "Aggregators":
-				self.naming_series = frappe.db.get_value(
+				# Get the aggregator series prefix
+				aggregator_series_prefix = frappe.db.get_value(
 					"URY Restaurant", restaurant, "aggregator_series_prefix"
+				)
+
+				if aggregator_series_prefix:
+					self.naming_series = "SINV-" + aggregator_series_prefix
+
+				else:
+					# Fallback to invoice_series_prefix if aggregator_series_prefix is not available
+					self.naming_series = "SINV-" + frappe.db.get_value(
+						"URY Restaurant", restaurant, "invoice_series_prefix"
+					)
+
+			else:
+				# Use invoice_series_prefix for non-aggregator orders
+				self.naming_series = "SINV-" + frappe.db.get_value(
+					"URY Restaurant", restaurant, "invoice_series_prefix"
 				)
 
 	def order_type_update(self):
