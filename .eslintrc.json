@@ -1,0 +1,19 @@
+{
+  "env": {
+    "browser": true,
+    "es2021": true
+  },
+  "globals": {
+    "frappe": "readonly",
+    "__": "readonly",
+    "cur_frm": "readonly",
+    "cur_list": "readonly",
+    "cur_dialog": "readonly",
+    "erpnext": "readonly"
+  },
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "script"
+  },
+  "rules": {}
+}
