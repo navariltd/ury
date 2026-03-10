@@ -169,6 +169,15 @@ def clear_all_pos_cache():
     frappe.cache().delete_keys("item_stock:")
     return True
 
+def invalidate_item_stock_cache(doc, method=None):
+    """
+    Triggered by Stock Ledger Entry (SLE).
+    Covers ALL stock-changing transactions in ERPNext.
+    """
+    if doc.item_code and doc.warehouse:
+        stock_key = f"item_stock:{doc.warehouse}:{doc.item_code}"
+        frappe.cache().delete_value(stock_key)
+
 
 def get_qsr_item_groups(pos_profile):
 	"""
