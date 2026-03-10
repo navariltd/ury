@@ -8,12 +8,15 @@ frappe.query_reports["Employee Item Wise Sales"] = {
       label: __("From Date"),
       fieldtype: "Date",
       mandatory: 1,
+      reqd: 1,
     },
     {
       fieldname: "end_date",
       label: __("To Date"),
       fieldtype: "Date",
       mandatory: 1,
+      default: frappe.datetime.get_today(),
+      reqd: 1,
     },
     {
       fieldname: "employee",
@@ -21,6 +24,7 @@ frappe.query_reports["Employee Item Wise Sales"] = {
       fieldtype: "Link",
       options: "User",
       mandatory: 1,
+      reqd: 1,
     },
     {
       fieldname: "branch",
@@ -28,6 +32,7 @@ frappe.query_reports["Employee Item Wise Sales"] = {
       fieldtype: "Link",
       options: "Branch",
       mandatory: 1,
+      reqd: 1,
     },
   ],
 };
