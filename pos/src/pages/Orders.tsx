@@ -241,7 +241,7 @@ export default function Orders() {
         fetchOrders();
       }
     } catch (err: any) {
-      showToast.error("Print failed: " + (err?.message || err));
+      console.error("Print failed: " + (err?.message || err));
     } finally {
       setIsPrinting(false);
     }
