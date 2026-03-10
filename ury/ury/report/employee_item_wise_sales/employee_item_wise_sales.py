@@ -44,6 +44,7 @@ def apply_filters(filters):
 	end_date = filters.get("end_date")
 	branch = filters.get("branch")
 	employee = filters.get("employee")
+	source_document = filters.get("source_document") or "POS Invoice"
 
 	if not start_date:
 		frappe.throw(_("Please select From Date"), exc=frappe.ValidationError)
@@ -53,17 +54,34 @@ def apply_filters(filters):
 		frappe.throw(_("Please select Branch"), exc=frappe.ValidationError)
 	if not employee:
 		frappe.throw(_("Please select User"), exc=frappe.ValidationError)
+	if source_document not in ("POS Invoice", "Sales Invoice"):
+		frappe.throw(
+			_("Source Document must be 'POS Invoice' or 'Sales Invoice'"),
+			exc=frappe.ValidationError,
+		)
 
 	return {
 		"start_date": start_date,
 		"end_date": end_date,
 		"branch": branch,
 		"employee": employee,
+		"source_document": source_document,
 	}
 
 
 def get_data(filters):
-	sql = """
+	source_document = filters.get("source_document", "POS Invoice")
+
+	if source_document == "Sales Invoice":
+		parent_table = "tabSales Invoice"
+		child_table = "tabSales Invoice Item"
+		status_condition = "a.`docstatus` = 1"
+	else:
+		parent_table = "tabPOS Invoice"
+		child_table = "tabPOS Invoice Item"
+		status_condition = 'a.`status` IN ("Consolidated","Paid") AND a.`docstatus` = 1'
+
+	sql = f"""
     SELECT
         i.`item_group` AS item_group,
         b.`item_name` AS item_name,
@@ -91,15 +109,14 @@ def get_data(filters):
             UNION
             SELECT %(end_date)s AS `date`
         ) AS date_list
-    LEFT JOIN `tabPOS Invoice` a ON (
+    LEFT JOIN `{parent_table}` a ON (
         a.`branch` = %(branch)s
-        AND a.`status` IN ("Consolidated","Paid")
-        AND a.`docstatus` = 1
+        AND {status_condition}
     )
     LEFT JOIN `tabURY Report Settings` rs ON (
         rs.`branch` = %(branch)s
     )
-    INNER JOIN `tabPOS Invoice Item` b ON (
+    INNER JOIN `{child_table}` b ON (
         a.name = b.parent
     )
     INNER JOIN `tabUser` e ON (

@@ -34,5 +34,13 @@ frappe.query_reports["Employee Item Wise Sales"] = {
       mandatory: 1,
       reqd: 1,
     },
+    {
+      fieldname: "source_document",
+      label: __("Source Document"),
+      fieldtype: "Select",
+      options: "POS Invoice\nSales Invoice",
+      default: "POS Invoice",
+      reqd: 1,
+    },
   ],
 };
