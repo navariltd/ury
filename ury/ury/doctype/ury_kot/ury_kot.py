@@ -248,6 +248,7 @@ def sync_work_orders(item_totals, existing_map, company, fg_warehouse, invoice_t
                     "bom_no": default_bom,
                     "qty": required_qty,
                     "company": company,
+                    "source_warehouse": fg_warehouse,
                     "fg_warehouse": fg_warehouse,
                     "invoice_type": invoice_type,
                     "invoice": invoice_id,
