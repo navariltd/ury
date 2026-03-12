@@ -115,6 +115,9 @@ class URYSalesInvoice(SalesInvoice):
 	def validate_stock_availablility(self):
 		if self.is_return:
 			return
+		
+		if not self.update_stock:
+			return
 
 		if self.docstatus.is_draft() and not frappe.db.get_value(
 			"POS Profile", self.pos_profile, "validate_stock_on_save"
