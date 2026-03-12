@@ -511,29 +511,30 @@ class URYSalesInvoice(SalesInvoice):
 		if not self.get_auto_manufacture_setting():
 			return
 
-		failed, skipped, succeeded = [], [], []
+		frappe.db.savepoint("before_auto_manufacture")
 
-		work_orders = frappe.get_all(
-			"Work Order",
-			filters={"invoice_type": "Sales Invoice", "invoice": self.name},
-			fields=["name", "status", "docstatus", "qty", "produced_qty"],
-		)
+		try:
 
-		for wo in work_orders:
-			work_order = frappe.get_doc("Work Order", wo.name)
+			failed, skipped, succeeded = [], [], []
 
-			if work_order.docstatus == 0:
-				work_order.submit()
-				work_order.reload()
+			work_orders = frappe.get_all(
+				"Work Order",
+				filters={"invoice_type": "Sales Invoice", "invoice": self.name},
+				fields=["name", "status", "docstatus", "qty", "produced_qty"],
+			)
 
-			pending_qty = (work_order.qty or 0) - (work_order.produced_qty or 0)
+			for wo in work_orders:
+				work_order = frappe.get_doc("Work Order", wo.name)
 
-			if pending_qty <= 0 or work_order.status == "Completed":
-				skipped.append(f"{wo.name} (already completed or no pending qty)")
-				continue
+				if work_order.docstatus == 0:
+					work_order.submit()
+					work_order.reload()
 
-			try:
-				frappe.db.savepoint("before_auto_manufacture")
+				pending_qty = (work_order.qty or 0) - (work_order.produced_qty or 0)
+
+				if pending_qty <= 0 or work_order.status == "Completed":
+					skipped.append(f"{wo.name} (already completed or no pending qty)")
+					continue
 
 				existing_entries = frappe.get_all(
 					"Stock Entry",
@@ -589,46 +590,38 @@ class URYSalesInvoice(SalesInvoice):
 					frappe.db.set_value("Work Order", work_order.name, "status", "Completed")
 					frappe.db.set_value("Work Order", work_order.name, "actual_end_date", now())
 
-			except frappe.ValidationError as e:
-				frappe.db.rollback(save_point="before_auto_manufacture")
-				frappe.clear_messages()
-				failed.append(f"{work_order.name}: insufficient stock → {e}")
+			kots = frappe.get_all(
+				"URY KOT", filters={"invoice_type": "Sales Invoice", "invoice": self.name}, fields=["name"]
+			)
 
-			except Exception:
-				frappe.db.rollback(save_point="before_auto_manufacture")
-				failed.append(f"{work_order.name}: unexpected error → {frappe.get_traceback()}")
+			for kot in kots:
+				_mark_kot_served(kot["name"])
 
-		def _mark_kot_served(kot_name):
-			kot_doc = frappe.get_doc("URY KOT", kot_name)
-
-			if kot_doc.order_status == "Served":
-				return
-
-			current_time = get_datetime()
-			production_time = current_time - kot_doc.creation
-			production_time_minutes = production_time.total_seconds() / 60
-
-			kot_doc.start_time_serv = now()
-			kot_doc.production_time = production_time_minutes
-			kot_doc.order_status = "Served"
-
-			kot_doc.save(ignore_permissions=True)
-
-		kots = frappe.get_all(
-			"URY KOT", filters={"invoice_type": "Sales Invoice", "invoice": self.name}, fields=["name"]
-		)
-
-		for kot in kots:
-			_mark_kot_served(kot["name"])
-
-		frappe.db.commit()
-
-		if failed:
+		except Exception as e:
+			frappe.db.rollback(save_point="before_auto_manufacture")
+			failed.append(f"{work_order.name}: unexpected error → {frappe.get_traceback()}")
+			frappe.log_error("Auto Manufacture Failure", frappe.get_traceback())
 			frappe.clear_messages()
 			frappe.throw(
-				"Some Work Orders could not be completed:\n\n" + "\n".join(failed),
-				title="Auto Manufacture Errors",
+				f"Manufacturing failed. The order has been reset to its previous state so you can edit it. <br><br><b>Error:</b> {str(e)}",
+				title="Auto-Process Failed"
 			)
+
+def _mark_kot_served(kot_name):
+	kot_doc = frappe.get_doc("URY KOT", kot_name)
+
+	if kot_doc.order_status == "Served":
+		return
+
+	current_time = get_datetime()
+	production_time = current_time - kot_doc.creation
+	production_time_minutes = production_time.total_seconds() / 60
+
+	kot_doc.start_time_serv = now()
+	kot_doc.production_time = production_time_minutes
+	kot_doc.order_status = "Served"
+
+	kot_doc.save(ignore_permissions=True)
 
 
 	def invalidate_pos_stock_cache(self):
