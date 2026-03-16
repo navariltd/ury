@@ -30,6 +30,14 @@ frappe.query_reports["Item Wise Sales"] = {
 			label: __("Branch"),
 			fieldtype: "Link",
 			options: "Branch",
+		},
+		{
+			fieldname: "invoice_type",
+			label: __("Invoice Type"),
+			fieldtype: "Select",
+			options: "Sales Invoice\nPOS Invoice",
+			default: "Sales Invoice",
+			req: 1
 		}
 	]
 };
