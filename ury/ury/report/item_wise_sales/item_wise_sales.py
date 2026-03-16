@@ -55,6 +55,7 @@ def apply_filters(filters):
     branch = filters.get("branch")
     start_time = filters.get("start_time") or "00:00:00"
     end_time = filters.get("end_time") or "23:59:59"
+    invoice_type = filters.get("invoice_type")
 
     if not start_date:
         frappe.throw(_("Please select From Date"), exc=frappe.ValidationError)
@@ -63,6 +64,13 @@ def apply_filters(filters):
     if not branch:
         frappe.throw(_("Please select Branch"), exc=frappe.ValidationError)
 
+    if invoice_type == "Sales Invoice":
+        parent_doctype = "Sales Invoice"
+        pos_condition = "AND a.is_pos = 1 AND a.is_created_using_pos = 1"
+    else:
+        parent_doctype = "POS Invoice"
+        pos_condition = ""
+
     # return a clean dict used for SQL params
     return {
         "start_date": start_date,
@@ -70,6 +78,8 @@ def apply_filters(filters):
         "branch": branch,
         "start_time": start_time,
         "end_time": end_time,
+        "parent_doctype": parent_doctype,
+        "pos_condition": pos_condition
     }
 
 
@@ -77,7 +87,13 @@ def get_data(filters):
     """
     Execute the SQL (adapted from the original query) and return list of dicts.
     """
-    sql = """
+
+    parent_tab = f"tab{filters['parent_doctype']}"
+    child_tab = f"tab{filters['parent_doctype']} Item"
+    pos_cond = filters['pos_condition']
+
+
+    sql = f"""
 	SELECT 
 		c.`item_group` AS item_group,
 		c.`item_name` AS item_name,
@@ -105,12 +121,13 @@ def get_data(filters):
 			UNION
 			SELECT %(end_date)s AS `date`
 		) AS date_list
-	LEFT JOIN `tabPOS Invoice` a ON (
+	LEFT JOIN `{parent_tab}` a ON (
 		a.`branch` = %(branch)s
 		AND a.`status` IN ("Consolidated","Paid") 
 		AND a.`docstatus` = 1 
+        {pos_cond}
 	)
-	INNER JOIN `tabPOS Invoice Item` b ON a.`name`=b.`parent`
+	INNER JOIN `{child_tab}` b ON a.`name`=b.`parent`
 	LEFT JOIN `tabItem` c ON c.`item_code` = b.`item_code`
 	LEFT JOIN `tabURY Report Settings` rs ON (
 		rs.`branch` = %(branch)s

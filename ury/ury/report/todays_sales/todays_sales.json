@@ -1,0 +1,53 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [],
+ "creation": "2026-03-16 22:00:43.611677",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "branch",
+   "fieldtype": "Link",
+   "label": "Branch",
+   "mandatory": 1,
+   "options": "Branch",
+   "wildcard_filter": 0
+  },
+  {
+   "default": "Sales Invoice",
+   "fieldname": "invoice_type",
+   "fieldtype": "Select",
+   "label": "Invoice Type",
+   "mandatory": 1,
+   "options": "Sales Invoice\nPOS Invoice",
+   "wildcard_filter": 0
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-03-16 22:00:43.611677",
+ "modified_by": "Administrator",
+ "module": "URY",
+ "name": "Todays Sales",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    DAYNAME(CURDATE()) AS \"Today\",\n    COUNT(combined.`name`) AS \"Total Invoices\",\n    ROUND(SUM(combined.`net_total`), 2) AS \"Item Total\",\n    ROUND(SUM(combined.`total_taxes_and_charges`), 2) AS \"Total Taxes and Charges\",\n    ROUND(SUM(combined.`grand_total`), 2) AS \"Grand Total\",\n    ROUND(SUM(combined.`grand_total` - combined.`rounded_total`), 2) AS \"Round Off\",\n    ROUND(SUM(combined.`rounded_total` - combined.`paid_amount` + combined.`change_amount`), 2) AS \"Cash Discounts\"\nFROM (\n    /* Source 1: POS Invoices */\n    SELECT \n        name, branch, docstatus, status, posting_date, posting_time,\n        net_total, total_taxes_and_charges, grand_total, rounded_total, paid_amount, change_amount\n    FROM `tabPOS Invoice`\n    WHERE %(invoice_type)s = 'POS Invoice'\n\n    UNION ALL\n\n    /* Source 2: Sales Invoices created using POS */\n    SELECT \n        name, branch, docstatus, status, posting_date, posting_time,\n        net_total, total_taxes_and_charges, grand_total, rounded_total, paid_amount, change_amount\n    FROM `tabSales Invoice`\n    WHERE %(invoice_type)s = 'Sales Invoice'\n      AND is_pos = 1 \n      AND is_created_using_pos = 1\n) AS combined\nLEFT JOIN `tabURY Report Settings` rs ON (\n    rs.`branch` = %(branch)s\n)\nWHERE\n    combined.`branch` = %(branch)s\n    AND combined.`docstatus` = 1\n    AND combined.`status` IN (\"Consolidated\", \"Paid\", \"Completed\") \n    AND (\n        ((rs.`hours` IS NULL OR rs.`hours` = 0) AND combined.`posting_date` = CURDATE())\n        OR (rs.`hours` > 0 \n            AND TIMESTAMP(combined.`posting_date`, combined.`posting_time`) <= TIMESTAMP(DATE_ADD(CURDATE(), INTERVAL 1 DAY), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00')) \n            AND TIMESTAMP(combined.`posting_date`, combined.`posting_time`) >= TIMESTAMP(CURDATE(), CONCAT(LPAD(rs.`hours`, 2, '0'), ':00:00'))\n        )\n        OR (rs.`branch` IS NULL AND combined.`posting_date` = CURDATE())\n    )",
+ "ref_doctype": "POS Invoice",
+ "report_name": "Todays Sales",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "URY Manager"
+  }
+ ],
+ "timeout": 0
+}
