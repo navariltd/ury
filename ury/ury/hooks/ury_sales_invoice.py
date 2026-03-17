@@ -607,6 +607,19 @@ class URYSalesInvoice(SalesInvoice):
 				title="Auto-Process Failed"
 			)
 
+	def invalidate_pos_stock_cache(self):
+		"""
+		Clears the Redis cache for each item in this invoice
+		to ensure the POS shows updated stock levels.
+		"""
+		if not self.items:
+			return
+		
+		for item in self.items:
+			cache_key = f"item_stock:{item.warehouse}:{item.item_code}"
+			frappe.cache().delete_value(cache_key)
+
+
 def _mark_kot_served(kot_name):
 	kot_doc = frappe.get_doc("URY KOT", kot_name)
 
@@ -622,16 +635,3 @@ def _mark_kot_served(kot_name):
 	kot_doc.order_status = "Served"
 
 	kot_doc.save(ignore_permissions=True)
-
-
-	def invalidate_pos_stock_cache(self):
-		"""
-		Clears the Redis cache for each item in this invoice
-		to ensure the POS shows updated stock levels.
-		"""
-		if not self.items:
-			return
-		
-		for item in self.items:
-			cache_key = f"item_stock:{item.warehouse}:{item.item_code}"
-			frappe.cache().delete_value(cache_key)
