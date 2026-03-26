@@ -128,11 +128,15 @@ export default function POS() {
       {mobileSidebarOpen && (
         <>
           <div
-            className='lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40'
+            className='lg:hidden fixed inset-0 bg-black/40 z-40'
             onClick={() => setMobileSidebarOpen(false)}
           />
-          <div className='lg:hidden fixed inset-y-0 left-0 w-64 bg-white z-50 shadow-xl'>
-            <Sidebar disabled={isMenuInteractionDisabled()} />
+          <div className='lg:hidden fixed top-16 left-0 bottom-0 w-64 bg-white z-50 shadow-xl'>
+            <Sidebar
+              disabled={isMenuInteractionDisabled()}
+              className='h-full'
+              onCategorySelect={() => setMobileSidebarOpen(false)}
+            />
           </div>
         </>
       )}

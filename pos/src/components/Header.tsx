@@ -40,7 +40,7 @@ const Header = () => {
     searchValue = orderSearchInput;
     searchOnChange = (e) => setOrderSearchInput(e.target.value);
   } else if (location.pathname === "/") {
-    searchPlaceholder = "Search Menu";
+    searchPlaceholder = "Search Menu Bar";
     searchValue = searchQuery;
     searchOnChange = (e) => setSearchQuery(e.target.value);
   }
@@ -132,16 +132,16 @@ const Header = () => {
           </Link>
         </div>
 
-        {/* Search Bar - Hidden on small mobile, visible on md+ */}
-        <div className='hidden md:flex px-4 py-2 flex-1 items-center max-w-2xl mx-4 lg:mx-8 bg-gray-50 hover:bg-gray-100 border border-input rounded-md'>
+        {/* Search Bar - Visible on all screen sizes with responsive styling */}
+        <div className='flex px-2 md:px-4 py-2 flex-1 items-center max-w-sm md:max-w-2xl mx-2 md:mx-4 lg:mx-8 bg-gray-50 hover:bg-gray-100 border border-input rounded-md'>
           <Input
             ref={searchInputRef}
             placeholder={searchPlaceholder}
-            className='h-fit p-0 w-full bg-transparent border-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0'
+            className='h-fit p-0 w-full bg-transparent border-0 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 text-sm md:text-base'
             value={searchValue}
             onChange={searchOnChange}
           />
-          <div className='flex items-center gap-2 text-gray-400'>
+          <div className='flex items-center gap-2 text-gray-400 flex-shrink-0'>
             <Command className='w-4 h-4' />
             <span className='hidden lg:inline'>K</span>
           </div>
