@@ -117,16 +117,19 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
     setIsProcessing(true);
     setError(null);
     try {
-      const res = await call.post("ury.ury.doctype.ury_order.ury_order.make_invoice", {
-        additionalDiscount: discountValue ? parseInt(discountValue) : null,
-        cashier,
-        customer,
-        invoice,
-        owner,
-        payments,
-        pos_profile: posProfile,
-        table,
-      });
+      const res = await call.post(
+        "ury.ury.doctype.ury_order.ury_order.make_invoice",
+        {
+          additionalDiscount: discountValue ? parseInt(discountValue) : null,
+          cashier,
+          customer,
+          invoice,
+          owner,
+          payments,
+          pos_profile: posProfile,
+          table,
+        },
+      );
 
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await handlePrintOrder();
@@ -160,7 +163,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
             const messages = JSON.parse(err._server_messages);
             const messageObj = JSON.parse(messages[0]);
             errorMessage = stripHtml(
-              messageObj.message || messageObj.description || errorMessage
+              messageObj.message || messageObj.description || errorMessage,
             );
           } catch {
             errorMessage = "Server error occurred during payment processing";
@@ -309,7 +312,7 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
         </div>
 
         {/* Right Column - Order Summary and Pay Button */}
-        <div className='md:w-1/2 p-6 overflow-y-auto'>
+        <div className='md:w-1/2 p-6 flex flex-col'>
           {/* Enhanced Error Message Display */}
           {error && (
             <div className='mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-r-lg'>
@@ -329,10 +332,10 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
             </div>
           )}
 
-          {/* Order Summary */}
-          <div className='space-y-3 mb-6'>
+          {/* Order Summary - Fixed Height, Non-scrollable */}
+          <div className='space-y-3 flex-grow flex flex-col'>
             <h3 className='text-lg font-semibold'>Order Summary</h3>
-            <div className='space-y-2 text-sm'>
+            <div className='space-y-2 text-sm flex-grow flex flex-col justify-between'>
               {/* Subtotal (Grand Total) */}
               <div className='flex justify-between'>
                 <span className='text-gray-600'>Subtotal</span>
@@ -366,20 +369,22 @@ const PaymentDialog: React.FC<PaymentDialogProps> = ({
           </div>
 
           {/* Payment Button */}
-          <Button
-            onClick={handlePayment}
-            disabled={isProcessing || payments.length === 0}
-            variant={
-              isProcessing || payments.length === 0 ? "secondary" : "default"
-            }
-            className='w-full'
-          >
-            {isProcessing
-              ? "Processing..."
-              : `Pay ${formatCurrency(
-                  paymentsTotal > 0 ? paymentsTotal : finalTotal
-                )}`}
-          </Button>
+          <div className='mt-6'>
+            <Button
+              onClick={handlePayment}
+              disabled={isProcessing || payments.length === 0}
+              variant={
+                isProcessing || payments.length === 0 ? "secondary" : "default"
+              }
+              className='w-full'
+            >
+              {isProcessing
+                ? "Processing..."
+                : `Pay ${formatCurrency(
+                    paymentsTotal > 0 ? paymentsTotal : finalTotal,
+                  )}`}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
