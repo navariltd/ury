@@ -104,7 +104,7 @@ const Header = () => {
 
   const handleClearCache = async () => {
     try {
-      await call.get("ury.ury_pos.api.clear_all_pos_cache")
+      await call.get("ury.ury_pos.api.clear_all_pos_cache");
     } catch (error) {
       console.error("Failed to clear server cache", error);
       showToast.error("Partial cache clear. Some server data may remain.");
@@ -119,7 +119,7 @@ const Header = () => {
   };
 
   return (
-    <header className='bg-white border-b border-gray-200'>
+    <header className='relative z-[60] bg-white border-b border-gray-200'>
       <div className='flex items-center justify-between h-16 px-3 lg:px-6'>
         {/* Logo */}
         <div className='flex items-center flex-shrink-0'>
@@ -167,7 +167,7 @@ const Header = () => {
 
             {/* User dropdown */}
             {showUserMenu && (
-              <div className='absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50'>
+              <div className='absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-[70]'>
                 <div className='p-4 border-b border-gray-200'>
                   <p className='text-sm font-medium text-gray-900'>
                     {user?.full_name || "User"}
