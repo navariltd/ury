@@ -798,33 +798,38 @@ def getAggregatorMOP(aggregator):
 def validate_pos_close(pos_profile):
 	enable_unclosed_pos_check = frappe.db.get_value("POS Profile", pos_profile, "custom_daily_pos_close")
 
-	if enable_unclosed_pos_check:
-		current_datetime = frappe.utils.now_datetime()
-		start_of_day = current_datetime.replace(hour=5, minute=0, second=0, microsecond=0)
+	if not enable_unclosed_pos_check:
+		return { "status": "Success" }
+	
+	current_datetime = frappe.utils.now_datetime()
+	day_boundary_hour = 5
 
-		if current_datetime > start_of_day:
-			previous_day = start_of_day - timedelta(days=1)
+	if current_datetime.hour < day_boundary_hour:
+		business_day_start = current_datetime.replace(hour=day_boundary_hour, minute=0, second=0, microsecond=0) - timedelta(days=1)
+	else:
+		business_day_start = current_datetime.replace(hour=day_boundary_hour, minute=0, second=0, microsecond=0)
 
-		else:
-			previous_day = start_of_day
+	unclosed_entry = frappe.db.get_value(
+		"POS Opening Entry",
+		{
+			"posting_date": ["<", business_day_start.date()],
+			"status": "Open",
+			"pos_profile": pos_profile,
+			"docstatus": 1,
+			"user": frappe.session.user,
+		},
+		["name", "posting_date"],
+		as_dict=True
+	)
 
-		unclosed_pos_opening = frappe.db.exists(
-			"POS Opening Entry",
-			{
-				"posting_date": previous_day.date(),
-				"status": "Open",
-				"pos_profile": pos_profile,
-				"docstatus": 1,
-				"user": frappe.session.user,
-			},
-		)
-
-		if unclosed_pos_opening:
-			return "Failed"
-
-		return "Success"
-
-	return "Success"
+	if unclosed_entry:
+		return {
+			"status": "Failed",
+			"message": _("You have an unclosed POS session ({0}) from {1}. Please close it before opening a new one.")
+                .format(unclosed_entry.name, unclosed_entry.posting_date)
+		}
+	
+	return {"status": "Success"}
 
 
 @frappe.whitelist()
