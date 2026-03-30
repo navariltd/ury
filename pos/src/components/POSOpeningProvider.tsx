@@ -31,7 +31,7 @@ const POSOpeningProvider = ({ children }: POSOpeningProviderProps) => {
       if (posProfile?.custom_daily_pos_close === 1) {
         try {
           const closeResponse = await validatePOSClose(posProfile.name);
-          if (closeResponse.message === 'Failed') {
+          if (closeResponse.message?.status === 'Failed') {
             // Previous POS is not closed
             setValidationType('closing');
             return;
