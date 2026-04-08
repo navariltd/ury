@@ -161,13 +161,11 @@ const OrderPanel = () => {
       if (
         error &&
         typeof error === "object" &&
-        "_server_messages" in error &&
-        typeof (error as any)._server_messages === "string"
+        "exception" in error &&
+        typeof (error as any).exception === "string"
       ) {
         try {
-          const messages = JSON.parse((error as any)._server_messages);
-          const messageObj = JSON.parse(messages[0]);
-          showToast.error(messageObj.message || "API error");
+          showToast.error((error as any).exception);
         } catch {
           showToast.error("API error");
         }
