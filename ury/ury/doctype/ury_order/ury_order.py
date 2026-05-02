@@ -276,7 +276,7 @@ def sync_order(
             frappe.throw(
                 _(
                     "No item price found for Item: {0} in Price List: {1}. Please check the price list settings."
-                ).format(item.item_code, price_list)
+                ).format(d.get("item"), price_list)
             )
 
         else:
