@@ -8,7 +8,13 @@ from erpnext.accounts.doctype.pos_closing_entry.pos_closing_entry import (
 from erpnext.accounts.doctype.pos_invoice.pos_invoice import get_stock_availability
 from frappe import _
 from frappe.query_builder import DocType
-from frappe.utils import flt, get_datetime, now_datetime, strip_html_tags, time_diff_in_seconds
+from frappe.utils import (
+	flt,
+	get_datetime,
+	now_datetime,
+	strip_html_tags,
+	time_diff_in_seconds,
+)
 
 UMI = DocType("URY Menu Item")
 IT = DocType("Item")
@@ -46,29 +52,33 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 	if specified in the POS profile settings.
 
 	Args:
-	    pos_profile (str): The name of the POS Profile to use for menu selection.
-	    room (str, optional): The room identifier to fetch a room-specific menu. Defaults to None.
-	    order_type (str, optional): The order type (e.g., dine-in, takeaway) to fetch an order-type-specific menu. Defaults to None.
+		pos_profile (str): The name of the POS Profile to use for menu selection.
+		room (str, optional): The room identifier to fetch a room-specific menu. Defaults to None.
+		order_type (str, optional): The order type (e.g., dine-in, takeaway) to fetch an order-type-specific menu. Defaults to None.
 
 	Returns:
-	    dict: A dictionary containing:
-	        - "items": A list of menu items with their details and stock availability.
-	        - "modified_time": The last modified timestamp of the menu.
-	        - "name": The name of the selected menu.
+		dict: A dictionary containing:
+			- "items": A list of menu items with their details and stock availability.
+			- "modified_time": The last modified timestamp of the menu.
+			- "name": The name of the selected menu.
 
 	Raises:
-	    frappe.ValidationError: If no active menu is set for the restaurant.
+		frappe.ValidationError: If no active menu is set for the restaurant.
 	"""
 	user_role = frappe.get_roles()
 	pos_profile_doc = frappe.get_doc("POS Profile", pos_profile)
 
-	cashier = any(role.role in user_role for role in pos_profile_doc.role_allowed_for_billing)
+	cashier = any(
+		role.role in user_role for role in pos_profile_doc.role_allowed_for_billing
+	)
 	branch_name = getBranch()
 	restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch_name}, "name")
 
 	menu = None
 	if cashier and order_type:
-		order_type_wise_menu = frappe.db.get_value("URY Restaurant", restaurant, "order_type_wise_menu")
+		order_type_wise_menu = frappe.db.get_value(
+			"URY Restaurant", restaurant, "order_type_wise_menu"
+		)
 
 		if order_type_wise_menu:
 			menu = frappe.db.get_value(
@@ -78,16 +88,22 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 			)
 
 	if not menu and room:
-		room_wise_menu = frappe.db.get_value("URY Restaurant", restaurant, "room_wise_menu")
+		room_wise_menu = frappe.db.get_value(
+			"URY Restaurant", restaurant, "room_wise_menu"
+		)
 
 		if room_wise_menu:
-			menu = frappe.db.get_value("Menu for Room", {"parent": restaurant, "room": room}, "menu")
+			menu = frappe.db.get_value(
+				"Menu for Room", {"parent": restaurant, "room": room}, "menu"
+			)
 
 	if not menu:
 		menu = frappe.db.get_value("URY Restaurant", restaurant, "active_menu")
 
 	if not menu:
-		frappe.throw(_("Please set an active menu for Restaurant {0}").format(restaurant))
+		frappe.throw(
+			_("Please set an active menu for Restaurant {0}").format(restaurant)
+		)
 
 	# --- Caching Logic ---
 	# Cache the list of items to avoid heavy SQL Join every time.
@@ -118,7 +134,9 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 		).run(as_dict=True)
 
 		# Store the menu structure for 24 hours
-		frappe.cache().set_value(menu_structure_cache_key, menu_items, expires_in_sec=86400)
+		frappe.cache().set_value(
+			menu_structure_cache_key, menu_items, expires_in_sec=86400
+		)
 
 	# Get QSR item groups for this POS Profile
 	qsr_item_groups = get_qsr_item_groups(pos_profile)
@@ -136,10 +154,16 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 
 			if stock_balance is None:
 				# Cache Miss: Calculate stock and save for 1 hour
-				stock_balance = get_stock_availability(item.item_code, pos_profile_doc.warehouse)[0]
-				frappe.cache().set_value(stock_cache_key, stock_balance, expires_in_sec=3600)
+				stock_balance = get_stock_availability(
+					item.item_code, pos_profile_doc.warehouse
+				)[0]
+				frappe.cache().set_value(
+					stock_cache_key, stock_balance, expires_in_sec=3600
+				)
 
-		is_available = (stock_balance == "QSR" or stock_balance is None or stock_balance > 0)
+		is_available = (
+			stock_balance == "QSR" or stock_balance is None or stock_balance > 0
+		)
 
 		if pos_profile_doc.hide_unavailable_items:
 			if is_available:
@@ -159,31 +183,35 @@ def getRestaurantMenu(pos_profile, room=None, order_type=None):
 
 @frappe.whitelist()
 def invalidate_item_stock_cache(item_code, warehouse):
-    """Call this when a sale is made to force a stock refresh"""
-    frappe.cache().delete_value(f"item_stock:{warehouse}:{item_code}")
+	"""Call this when a sale is made to force a stock refresh"""
+	frappe.cache().delete_value(f"item_stock:{warehouse}:{item_code}")
+
 
 @frappe.whitelist()
 def clear_all_pos_cache():
-    """Wipes all menu and stock cache"""
-    frappe.cache().delete_keys("rest_menu_items:")
-    frappe.cache().delete_keys("item_stock:")
-    return True
+	"""Wipes all menu and stock cache"""
+	frappe.cache().delete_keys("rest_menu_items:")
+	frappe.cache().delete_keys("item_stock:")
+	return True
+
 
 def invalidate_item_stock_cache(doc, method=None):
-    """
-    Triggered by Stock Ledger Entry (SLE).
-    Covers ALL stock-changing transactions in ERPNext.
-    """
-    if doc.item_code and doc.warehouse:
-        stock_key = f"item_stock:{doc.warehouse}:{doc.item_code}"
-        frappe.cache().delete_value(stock_key)
+	"""
+	Triggered by Stock Ledger Entry (SLE).
+	Covers ALL stock-changing transactions in ERPNext.
+	"""
+	if doc.item_code and doc.warehouse:
+		stock_key = f"item_stock:{doc.warehouse}:{doc.item_code}"
+		frappe.cache().delete_value(stock_key)
 
 
 def get_qsr_item_groups(pos_profile):
 	"""
 	Get all item groups linked to the URY Production Unit assigned to this POS Profile.
 	"""
-	production_unit = frappe.db.get_value("URY Production Unit", {"pos_profile": pos_profile}, "name")
+	production_unit = frappe.db.get_value(
+		"URY Production Unit", {"pos_profile": pos_profile}, "name"
+	)
 
 	if not production_unit:
 		return []
@@ -200,11 +228,11 @@ def getBranch():
 	user = frappe.session.user
 	if user != "Administrator":
 		sql_query = """
-            SELECT b.branch
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
+			SELECT b.branch
+			FROM `tabURY User` AS a
+			INNER JOIN `tabBranch` AS b ON a.parent = b.name
+			WHERE a.user = %s
+		"""
 		branch_array = frappe.db.sql(sql_query, user, as_dict=True)
 		if not branch_array:
 			frappe.throw("User is not Associated with any Branch.Please refresh Page")
@@ -226,25 +254,31 @@ def getBranchRoom():
 		]
 
 	sql_query = """
-        SELECT b.branch , a.room
-        FROM `tabURY User` AS a
-        INNER JOIN `tabBranch` AS b ON a.parent = b.name
-        WHERE a.user = %s
-    """
+		SELECT b.branch , a.room
+		FROM `tabURY User` AS a
+		INNER JOIN `tabBranch` AS b ON a.parent = b.name
+		WHERE a.user = %s
+	"""
 
 	branch_array = frappe.db.sql(sql_query, user, as_dict=True)
 
 	if not branch_array:
-		frappe.throw("User is not linked to any branch. Please contact your administrator.")
+		frappe.throw(
+			"User is not linked to any branch. Please contact your administrator."
+		)
 
 	branch_name = branch_array[0].get("branch")
 	room_name = branch_array[0].get("room")
 
 	if not branch_name:
-		frappe.throw("Branch information is missing for the user. Please contact your administrator.")
+		frappe.throw(
+			"Branch information is missing for the user. Please contact your administrator."
+		)
 
 	if not room_name:
-		frappe.throw("No room assigned to this user. Please contact your administrator.")
+		frappe.throw(
+			"No room assigned to this user. Please contact your administrator."
+		)
 
 	return [
 		{
@@ -259,11 +293,11 @@ def getRoom():
 	user = frappe.session.user
 	if user != "Administrator":
 		sql_query = """
-            SELECT b.branch, a.room
-            FROM `tabURY User` AS a
-            INNER JOIN `tabBranch` AS b ON a.parent = b.name
-            WHERE a.user = %s
-        """
+			SELECT b.branch, a.room
+			FROM `tabURY User` AS a
+			INNER JOIN `tabBranch` AS b ON a.parent = b.name
+			WHERE a.user = %s
+		"""
 		branch_array = frappe.db.sql(sql_query, user, as_dict=True)
 
 		if not branch_array:
@@ -271,7 +305,10 @@ def getRoom():
 				"No branch or room information found for the user. Please contact your administrator."
 			)
 
-		room_details = [{"name": row.get("room"), "branch": row.get("branch")} for row in branch_array]
+		room_details = [
+			{"name": row.get("room"), "branch": row.get("branch")}
+			for row in branch_array
+		]
 
 		return room_details
 
@@ -284,7 +321,9 @@ def getModeOfPayment():
 	mode_of_payments = posProfiles.payments
 	modeOfPayments = []
 	for mop in mode_of_payments:
-		modeOfPayments.append({"mode_of_payment": mop.mode_of_payment, "opening_amount": float(0)})
+		modeOfPayments.append(
+			{"mode_of_payment": mop.mode_of_payment, "opening_amount": float(0)}
+		)
 	return modeOfPayments
 
 
@@ -299,18 +338,18 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
 	if status == "Draft":
 		invoices = frappe.db.sql(
 			f"""
-            SELECT
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type
-            FROM {table_name} pi
-            LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
-            AND (pi.invoice_printed = 1 OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = ''))
-            ORDER BY pi.modified desc
-            LIMIT %s OFFSET %s
-            """,
+			SELECT
+				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+				pi.posting_date, pi.rounded_total, pi.order_type
+			FROM {table_name} pi
+			LEFT JOIN `tabUser` u ON pi.cashier = u.email
+			WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
+			AND (pi.invoice_printed = 1 OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = ''))
+			ORDER BY pi.modified desc
+			LIMIT %s OFFSET %s
+			""",
 			(branch, status, cashier, limit, limit_start),
 			as_dict=True,
 		)
@@ -319,18 +358,18 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
 		docstatus = "Draft"
 		invoices = frappe.db.sql(
 			f"""
-            SELECT
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type
-            FROM {table_name} pi
-            LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
-            AND (pi.invoice_printed = 0 AND pi.restaurant_table IS NOT NULL)
-            ORDER BY pi.modified desc
-            LIMIT %s OFFSET %s
-            """,
+			SELECT
+				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+				pi.posting_date, pi.rounded_total, pi.order_type
+			FROM {table_name} pi
+			LEFT JOIN `tabUser` u ON pi.cashier = u.email
+			WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
+			AND (pi.invoice_printed = 0 AND pi.restaurant_table IS NOT NULL)
+			ORDER BY pi.modified desc
+			LIMIT %s OFFSET %s
+			""",
 			(branch, docstatus, cashier, limit, limit_start),
 			as_dict=True,
 		)
@@ -339,17 +378,17 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
 		docstatus = "Paid"
 		invoices = frappe.db.sql(
 			f"""
-            SELECT
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
-            FROM {table_name} pi
-            LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
-            ORDER BY pi.modified desc
-            LIMIT %s OFFSET %s
-            """,
+			SELECT
+				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+				pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
+			FROM {table_name} pi
+			LEFT JOIN `tabUser` u ON pi.cashier = u.email
+			WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
+			ORDER BY pi.modified desc
+			LIMIT %s OFFSET %s
+			""",
 			(branch, docstatus, cashier, limit, limit_start),
 			as_dict=True,
 		)
@@ -357,17 +396,17 @@ def getInvoiceForCashier(status, cashier, limit, limit_start):
 	else:
 		invoices = frappe.db.sql(
 			f"""
-            SELECT
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
-            FROM {table_name} pi
-            LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
-            ORDER BY pi.modified desc
-            LIMIT %s OFFSET %s
-            """,
+			SELECT
+				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+				pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
+			FROM {table_name} pi
+			LEFT JOIN `tabUser` u ON pi.cashier = u.email
+			WHERE pi.branch = %s AND pi.status = %s AND pi.cashier = %s
+			ORDER BY pi.modified desc
+			LIMIT %s OFFSET %s
+			""",
 			(branch, status, cashier, limit, limit_start),
 			as_dict=True,
 		)
@@ -393,18 +432,18 @@ def getPosInvoice(status, limit, limit_start):
 	if status == "Draft":
 		invoices = frappe.db.sql(
 			f"""
-            SELECT
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type
-            FROM {table_name} pi
-            LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s
-            AND (pi.invoice_printed = 1 OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = ''))
-            ORDER BY pi.modified desc
-            LIMIT %s OFFSET %s
-            """,
+			SELECT
+				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+				pi.posting_date, pi.rounded_total, pi.order_type
+			FROM {table_name} pi
+			LEFT JOIN `tabUser` u ON pi.cashier = u.email
+			WHERE pi.branch = %s AND pi.status = %s
+			AND (pi.invoice_printed = 1 OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = ''))
+			ORDER BY pi.modified desc
+			LIMIT %s OFFSET %s
+			""",
 			(branch, status, limit, limit_start),
 			as_dict=True,
 		)
@@ -413,18 +452,18 @@ def getPosInvoice(status, limit, limit_start):
 		docstatus = "Draft"
 		invoices = frappe.db.sql(
 			f"""
-            SELECT
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type
-            FROM {table_name} pi
-            LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s
-            AND (pi.invoice_printed = 0 AND pi.restaurant_table IS NOT NULL)
-            ORDER BY pi.modified desc
-            LIMIT %s OFFSET %s
-            """,
+			SELECT
+				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+				pi.posting_date, pi.rounded_total, pi.order_type
+			FROM {table_name} pi
+			LEFT JOIN `tabUser` u ON pi.cashier = u.email
+			WHERE pi.branch = %s AND pi.status = %s
+			AND (pi.invoice_printed = 0 AND pi.restaurant_table IS NOT NULL)
+			ORDER BY pi.modified desc
+			LIMIT %s OFFSET %s
+			""",
 			(branch, docstatus, limit, limit_start),
 			as_dict=True,
 		)
@@ -433,17 +472,17 @@ def getPosInvoice(status, limit, limit_start):
 		docstatus = "Paid"
 		invoices = frappe.db.sql(
 			f"""
-            SELECT
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
-            FROM {table_name} pi
-            LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s
-            ORDER BY pi.modified desc
-            LIMIT %s OFFSET %s
-            """,
+			SELECT
+				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+				pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
+			FROM {table_name} pi
+			LEFT JOIN `tabUser` u ON pi.cashier = u.email
+			WHERE pi.branch = %s AND pi.status = %s
+			ORDER BY pi.modified desc
+			LIMIT %s OFFSET %s
+			""",
 			(branch, docstatus, limit, limit_start),
 			as_dict=True,
 		)
@@ -451,17 +490,17 @@ def getPosInvoice(status, limit, limit_start):
 	else:
 		invoices = frappe.db.sql(
 			f"""
-            SELECT
-                pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-                pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
-                pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-                pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
-            FROM {table_name} pi
-            LEFT JOIN `tabUser` u ON pi.cashier = u.email
-            WHERE pi.branch = %s AND pi.status = %s
-            ORDER BY pi.modified desc
-            LIMIT %s OFFSET %s
-            """,
+			SELECT
+				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
+				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+				pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
+			FROM {table_name} pi
+			LEFT JOIN `tabUser` u ON pi.cashier = u.email
+			WHERE pi.branch = %s AND pi.status = %s
+			ORDER BY pi.modified desc
+			LIMIT %s OFFSET %s
+			""",
 			(branch, status, limit, limit_start),
 			as_dict=True,
 		)
@@ -489,30 +528,30 @@ def searchPosInvoice(query, status):
 		status_condition = "pi.status = 'Paid'"
 	elif status == "Unbilled":
 		status_condition = """pi.status = 'Draft'
-        AND pi.restaurant_table IS NOT NULL
-        AND pi.restaurant_table != ''
-        AND pi.invoice_printed = 0"""
+		AND pi.restaurant_table IS NOT NULL
+		AND pi.restaurant_table != ''
+		AND pi.invoice_printed = 0"""
 	else:
 		status_condition = f"pi.status = '{status}'"
 
 	# Use SQL query to get orders with cashier full name
 	pos_invoices = frappe.db.sql(
 		f"""
-        SELECT
-            pi.name, pi.customer, pi.grand_total, pi.posting_date, pi.posting_time,
-            pi.order_type, pi.restaurant_table, pi.status, pi.rounded_total,
-            pi.net_total, pi.mobile_number, pi.cashier, u.full_name as cashier_name
-        FROM {table_name} pi
-        LEFT JOIN `tabUser` u ON pi.cashier = u.email
-        WHERE ({status_condition})
-        AND (
-            LOWER(pi.name) LIKE %s
-            OR LOWER(pi.customer) LIKE %s
-            OR LOWER(pi.mobile_number) LIKE %s
-        )
-        ORDER BY pi.modified desc
-        LIMIT 10
-        """,
+		SELECT
+			pi.name, pi.customer, pi.grand_total, pi.posting_date, pi.posting_time,
+			pi.order_type, pi.restaurant_table, pi.status, pi.rounded_total,
+			pi.net_total, pi.mobile_number, pi.cashier, u.full_name as cashier_name
+		FROM {table_name} pi
+		LEFT JOIN `tabUser` u ON pi.cashier = u.email
+		WHERE ({status_condition})
+		AND (
+			LOWER(pi.name) LIKE %s
+			OR LOWER(pi.customer) LIKE %s
+			OR LOWER(pi.mobile_number) LIKE %s
+		)
+		ORDER BY pi.modified desc
+		LIMIT 10
+		""",
 		(f"%{query}%", f"%{query}%", f"%{query}%"),
 		as_dict=True,
 	)
@@ -534,8 +573,10 @@ def get_select_field_options():
 @frappe.whitelist()
 def fav_items(customer):
 	invoice_type = frappe.get_single_value("POS Settings", "invoice_type")
-	
-	pos_invoices = frappe.get_all(invoice_type, filters={"customer": customer}, fields=["name"])
+
+	pos_invoices = frappe.get_all(
+		invoice_type, filters={"customer": customer}, fields=["name"]
+	)
 	item_qty = {}
 
 	for invoice in pos_invoices:
@@ -547,7 +588,9 @@ def fav_items(customer):
 				item_qty[item_name] = 0
 			item_qty[item_name] += qty
 
-	favorite_items = [{"item_name": item_name, "qty": qty} for item_name, qty in item_qty.items()]
+	favorite_items = [
+		{"item_name": item_name, "qty": qty} for item_name, qty in item_qty.items()
+	]
 	return favorite_items
 
 
@@ -557,15 +600,15 @@ def getCashier(room):
 	cashier = None
 	pos_opening_list = frappe.db.sql(
 		"""
-        SELECT DISTINCT `tabPOS Opening Entry`.name
-        FROM `tabPOS Opening Entry`
-        INNER JOIN `tabMultiple Rooms`
-        ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
-        WHERE `tabPOS Opening Entry`.branch = %s
-        AND `tabPOS Opening Entry`.status = 'Open'
-        AND `tabPOS Opening Entry`.docstatus = 1
-        AND `tabMultiple Rooms`.room = %s
-    """,
+		SELECT DISTINCT `tabPOS Opening Entry`.name
+		FROM `tabPOS Opening Entry`
+		INNER JOIN `tabMultiple Rooms`
+		ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
+		WHERE `tabPOS Opening Entry`.branch = %s
+		AND `tabPOS Opening Entry`.status = 'Open'
+		AND `tabPOS Opening Entry`.docstatus = 1
+		AND `tabMultiple Rooms`.room = %s
+	""",
 		(branch, room),
 		as_dict=True,
 	)
@@ -605,6 +648,11 @@ def getPosProfile():
 		multiple_cashier = pos_profiles.custom_enable_multiple_cashier
 		edit_order_type = pos_profiles.custom_edit_order_type
 		enable_kot_reprint = pos_profiles.custom_enable_kot_reprint
+
+		# Initialize cashier and owner variables
+		cashier = None
+		owner = None
+
 		if multiple_cashier:
 			details = getBranchRoom()
 			room = details[0].get("name")
@@ -612,15 +660,15 @@ def getPosProfile():
 
 			pos_opening_list = frappe.db.sql(
 				"""
-                SELECT DISTINCT `tabPOS Opening Entry`.name
-                FROM `tabPOS Opening Entry`
-                INNER JOIN `tabMultiple Rooms`
-                ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
-                WHERE `tabPOS Opening Entry`.branch = %s
-                AND `tabPOS Opening Entry`.status = 'Open'
-                AND `tabPOS Opening Entry`.docstatus = 1
-                AND `tabMultiple Rooms`.room = %s
-            """,
+				SELECT DISTINCT `tabPOS Opening Entry`.name
+				FROM `tabPOS Opening Entry`
+				INNER JOIN `tabMultiple Rooms`
+				ON `tabMultiple Rooms`.parent = `tabPOS Opening Entry`.name
+				WHERE `tabPOS Opening Entry`.branch = %s
+				AND `tabPOS Opening Entry`.status = 'Open'
+				AND `tabPOS Opening Entry`.docstatus = 1
+				AND `tabMultiple Rooms`.room = %s
+			""",
 				(branch, room),
 				as_dict=True,
 			)
@@ -632,16 +680,37 @@ def getPosProfile():
 				)
 			else:
 				pos_opened_cashier = None
+			if not get_cashier.applicable_for_users:
+				frappe.throw(
+					_(
+						"POS Profile {0} has no users assigned. Please add users to 'Applicable For Users' in the POS Profile."
+					).format(pos_profile_name)
+				)
+
 			for user_details in get_cashier.applicable_for_users:
 				if user_details.custom_main_cashier:
 					owner = user_details.user
 
-				if frappe.session.user == owner:
+				if owner and frappe.session.user == owner:
 					cashier = owner
 				else:
 					cashier = pos_opened_cashier
 
+			if owner is None:
+				frappe.throw(
+					_(
+						"POS Profile {0} has multiple_cashier enabled but no main cashier configured. Please set 'Custom Main Cashier' for at least one user."
+					).format(pos_profile_name)
+				)
+
 		else:
+			if not get_cashier.applicable_for_users:
+				frappe.throw(
+					_(
+						"POS Profile {0} has no users assigned. Please add users to 'Applicable For Users' in the POS Profile."
+					).format(pos_profile_name)
+				)
+
 			cashier = get_cashier.applicable_for_users[0].user
 			owner = get_cashier.applicable_for_users[0].user
 
@@ -790,24 +859,32 @@ def getAggregatorMOP(aggregator):
 		"mode_of_payments",
 	)
 	modeOfPaymentsList = []
-	modeOfPaymentsList.append({"mode_of_payment": modeOfPayment, "opening_amount": float(0)})
+	modeOfPaymentsList.append(
+		{"mode_of_payment": modeOfPayment, "opening_amount": float(0)}
+	)
 	return modeOfPaymentsList
 
 
 @frappe.whitelist()
 def validate_pos_close(pos_profile):
-	enable_unclosed_pos_check = frappe.db.get_value("POS Profile", pos_profile, "custom_daily_pos_close")
+	enable_unclosed_pos_check = frappe.db.get_value(
+		"POS Profile", pos_profile, "custom_daily_pos_close"
+	)
 
 	if not enable_unclosed_pos_check:
-		return { "status": "Success" }
-	
+		return {"status": "Success"}
+
 	current_datetime = frappe.utils.now_datetime()
 	day_boundary_hour = 5
 
 	if current_datetime.hour < day_boundary_hour:
-		business_day_start = current_datetime.replace(hour=day_boundary_hour, minute=0, second=0, microsecond=0) - timedelta(days=1)
+		business_day_start = current_datetime.replace(
+			hour=day_boundary_hour, minute=0, second=0, microsecond=0
+		) - timedelta(days=1)
 	else:
-		business_day_start = current_datetime.replace(hour=day_boundary_hour, minute=0, second=0, microsecond=0)
+		business_day_start = current_datetime.replace(
+			hour=day_boundary_hour, minute=0, second=0, microsecond=0
+		)
 
 	unclosed_entry = frappe.db.get_value(
 		"POS Opening Entry",
@@ -819,16 +896,17 @@ def validate_pos_close(pos_profile):
 			"user": frappe.session.user,
 		},
 		["name", "posting_date"],
-		as_dict=True
+		as_dict=True,
 	)
 
 	if unclosed_entry:
 		return {
 			"status": "Failed",
-			"message": _("You have an unclosed POS session ({0}) from {1}. Please close it before opening a new one.")
-                .format(unclosed_entry.name, unclosed_entry.posting_date)
+			"message": _(
+				"You have an unclosed POS session ({0}) from {1}. Please close it before opening a new one."
+			).format(unclosed_entry.name, unclosed_entry.posting_date),
 		}
-	
+
 	return {"status": "Success"}
 
 
@@ -845,22 +923,22 @@ def getAllOrders(limit, limit_start):
 
 	invoices = frappe.db.sql(
 		f"""
-        SELECT
-            pi.name, '{invoice_type}' as doctype, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
-            pi.cashier, pi.waiter, u.full_name as waiter_name, pi.net_total, pi.posting_time,
-            pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
-            pi.posting_date, pi.rounded_total, pi.order_type
-        FROM {table_name} pi
-        LEFT JOIN `tabUser` u ON pi.waiter = u.email
-        WHERE pi.branch = %s AND pi.status = 'Draft'
-        AND (
-            pi.invoice_printed = 1
-            OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = '')
-            OR (pi.invoice_printed = 0 AND pi.order_type = 'Dine In')
-        )
-        ORDER BY pi.modified desc
-        LIMIT %s OFFSET %s
-        """,
+		SELECT
+			pi.name, '{invoice_type}' as doctype, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+			pi.cashier, pi.waiter, u.full_name as waiter_name, pi.net_total, pi.posting_time,
+			pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
+			pi.posting_date, pi.rounded_total, pi.order_type
+		FROM {table_name} pi
+		LEFT JOIN `tabUser` u ON pi.waiter = u.email
+		WHERE pi.branch = %s AND pi.status = 'Draft'
+		AND (
+			pi.invoice_printed = 1
+			OR (pi.invoice_printed = 0 AND COALESCE(pi.restaurant_table, '') = '')
+			OR (pi.invoice_printed = 0 AND pi.order_type = 'Dine In')
+		)
+		ORDER BY pi.modified desc
+		LIMIT %s OFFSET %s
+		""",
 		(branch, limit, limit_start),
 		as_dict=True,
 	)
@@ -993,7 +1071,10 @@ def retry_pos_closing(closing_entry_name: str):
 		closing_entry = frappe.get_doc("POS Closing Entry", closing_entry_name)
 
 		if closing_entry.status != "Failed":
-			return {"status": "error", "message": "This closing entry is not in failed status"}
+			return {
+				"status": "error",
+				"message": "This closing entry is not in failed status",
+			}
 
 		closing_entry.retry()
 
@@ -1018,7 +1099,9 @@ def submit_pos_closing(pos_opening_entry: str, closing_amounts: list | None = No
 
 		# inject actual amounts
 		if closing_amounts:
-			closing_map = {p["mode_of_payment"]: p["closing_amount"] for p in closing_amounts}
+			closing_map = {
+				p["mode_of_payment"]: p["closing_amount"] for p in closing_amounts
+			}
 			for row in closing_entry.payment_reconciliation:
 				row.closing_amount = closing_map.get(row.mode_of_payment, 0)
 				row.difference = row.closing_amount - row.expected_amount
