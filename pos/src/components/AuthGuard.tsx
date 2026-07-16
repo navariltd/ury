@@ -36,6 +36,18 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
     }
   }, [user, fetchPosProfile]);
 
+  useEffect(() => {
+    if (authError || configError || (user && posProfile && !hasAccess)) {
+      console.error('[URY POS] AuthGuard blocked POS rendering', {
+        authError,
+        configError,
+        user,
+        posProfile,
+        hasAccess,
+      });
+    }
+  }, [authError, configError, user, posProfile, hasAccess]);
+
   // Show loading state while either auth or config is loading
   if (authLoading || (user && configLoading) || isRechecking) {
     return (
@@ -105,4 +117,4 @@ const AuthGuard: React.FC<Props> = ({ children }) => {
   return <>{children}</>;
 };
 
-export default AuthGuard; 
+export default AuthGuard;

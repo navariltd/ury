@@ -21,6 +21,20 @@ IT = DocType("Item")
 
 
 @frappe.whitelist()
+def get_current_user_info():
+	"""Return authoritative identity data for the authenticated POS user."""
+	user = frappe.session.user
+	if user == "Guest":
+		frappe.throw(_("You must be logged in to access the POS"), frappe.AuthenticationError)
+
+	return {
+		"name": user,
+		"full_name": frappe.db.get_value("User", user, "full_name") or user,
+		"roles": frappe.get_roles(user),
+	}
+
+
+@frappe.whitelist()
 def getTable(room):
 	branch_name = getBranch()
 	tables = frappe.get_all(

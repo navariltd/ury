@@ -78,6 +78,7 @@ export const createConfigSlice: StateCreator<
       get().setAllowedRoles(allowedRoles);
       set({ isLoading: false });
     } catch (error) {
+      console.error('[URY POS] POS Profile initialization failed', error);
       set({ 
         error: (error as Error).message,
         isLoading: false,
@@ -90,6 +91,12 @@ export const createConfigSlice: StateCreator<
     const { allowedRoles } = get();
 
     if (!user || !user.roles || !allowedRoles.length) {
+      console.error('[URY POS] Access check cannot be completed', {
+        user,
+        userRoles: user?.roles,
+        allowedRoles,
+        reason: !user ? 'No authenticated user' : !user.roles ? 'User roles are missing' : 'POS Profile has no billing roles',
+      });
       set({ hasAccess: false });
       return;
     }
@@ -100,6 +107,11 @@ export const createConfigSlice: StateCreator<
 
     // If no access, we could redirect or show an error message
     if (!hasAccess) {
+      console.error('[URY POS] Access denied by role check', {
+        user: user.name,
+        userRoles: user.roles,
+        allowedRoles,
+      });
       set({ error: 'You do not have permission to access this application.' });
     }
   },
@@ -109,4 +121,4 @@ export const createConfigSlice: StateCreator<
     // After setting new roles, recheck access
     get().checkAccess();
   },
-}); 
+});
