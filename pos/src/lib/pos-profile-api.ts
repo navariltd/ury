@@ -102,13 +102,23 @@ export interface PosProfileFullResponse {
 }
 
 export async function getPosProfileLimitedFields(): Promise<PosProfileLimited> {
-  const res = await call.get('ury.ury_pos.api.getPosProfile');
-  return res.message;
+  try {
+    const res = await call.get('ury.ury_pos.api.getPosProfile');
+    return res.message;
+  } catch (error) {
+    console.error('[URY POS] getPosProfile request failed', error);
+    throw error;
+  }
 }
 
 export async function getPosProfileFull(posProfileName: string): Promise<PosProfileFull> {
-  const doc = await db.getDoc(DOCTYPES.POS_PROFILE, posProfileName);
-  return doc;
+  try {
+    const doc = await db.getDoc(DOCTYPES.POS_PROFILE, posProfileName);
+    return doc;
+  } catch (error) {
+    console.error(`[URY POS] Failed to load POS Profile "${posProfileName}"`, error);
+    throw error;
+  }
 }
 
 export async function getCombinedPosProfile(): Promise<PosProfileCombined> {

@@ -1,15 +1,11 @@
-import { call, db, auth } from './frappe-sdk';
+import { call, auth } from './frappe-sdk';
 
 type LoggedUserResponse = string | null;
 
-interface UserDoc {
+interface CurrentUserInfo {
   name: string;
   full_name: string;
-  roles: Array<{
-    name: string;
-    role: string;
-    parent: string;
-  }>;
+  roles: string[];
 }
 
 export const getLoggedUser = async (): Promise<LoggedUserResponse> => {
@@ -24,21 +20,21 @@ export const getLoggedUser = async (): Promise<LoggedUserResponse> => {
 
 export const getUserRoles = async (email: string): Promise<{ roles: string[]; full_name: string }> => {
   try {
-    // Get user details using db.getDoc
-    const userDoc = await db.getDoc<UserDoc>('User', email);
-    
-    if (!userDoc || !userDoc.roles) {
-      return { roles: [], full_name: '' };
+    const response = await call.get('ury.ury_pos.api.get_current_user_info');
+    const userInfo = response.message as CurrentUserInfo;
+
+    if (userInfo.name !== email) {
+      throw new Error(`Session user mismatch: expected ${email}, received ${userInfo.name}`);
     }
 
-    // Extract role names and full_name from the user doc
+    console.debug('[URY POS] Current user info', userInfo);
     return {
-      roles: userDoc.roles.map(role => role.role),
-      full_name: userDoc.full_name
+      roles: userInfo.roles,
+      full_name: userInfo.full_name,
     };
   } catch (error) {
-    console.error('Error getting user details:', error);
-    return { roles: [], full_name: '' };
+    console.error('[URY POS] Failed to load current user roles', error);
+    throw error;
   }
 };
 
