@@ -94,6 +94,8 @@ def get_order_invoice(table=None, invoiceNo=None, order_type=None, is_payment=No
 
         branch = getBranch()
         restaurant = frappe.db.get_value("URY Restaurant", {"branch": branch}, "name")
+        invoice.branch = branch
+        invoice.restaurant = restaurant
 
         menu = get_menu_name(order_type)
 

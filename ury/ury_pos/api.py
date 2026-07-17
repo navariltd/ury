@@ -240,20 +240,19 @@ def get_qsr_item_groups(pos_profile):
 @frappe.whitelist()
 def getBranch():
 	user = frappe.session.user
-	if user != "Administrator":
-		sql_query = """
-			SELECT b.branch
-			FROM `tabURY User` AS a
-			INNER JOIN `tabBranch` AS b ON a.parent = b.name
-			WHERE a.user = %s
-		"""
-		branch_array = frappe.db.sql(sql_query, user, as_dict=True)
-		if not branch_array:
-			frappe.throw("User is not Associated with any Branch.Please refresh Page")
+	sql_query = """
+		SELECT b.branch
+		FROM `tabURY User` AS a
+		INNER JOIN `tabBranch` AS b ON a.parent = b.name
+		WHERE a.user = %s
+	"""
+	branch_array = frappe.db.sql(sql_query, user, as_dict=True)
+	if not branch_array:
+		frappe.throw(
+			_("User {0} is not associated with any Branch.").format(user)
+		)
 
-		branch_name = branch_array[0].get("branch")
-
-		return branch_name
+	return branch_array[0].get("branch")
 
 
 @frappe.whitelist()
@@ -645,6 +644,10 @@ def getPosProfile():
 	cashier = None
 	owner = None
 	posProfile = frappe.db.exists("POS Profile", {"branch": branchName})
+	if not posProfile:
+		frappe.throw(
+			_("No POS Profile is configured for Branch {0}.").format(branchName)
+		)
 	pos_profiles = frappe.get_doc("POS Profile", posProfile)
 	global_defaults = frappe.get_single("Global Defaults")
 	disable_rounded_total = global_defaults.disable_rounded_total
