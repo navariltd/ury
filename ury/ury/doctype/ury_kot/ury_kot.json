@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_bulk_edit": 1,
  "allow_rename": 1,
  "autoname": "naming_series:",
  "creation": "2023-09-27 12:19:48.275531",
@@ -25,6 +26,7 @@
   "production_time",
   "column_break_9rksu",
   "start_time_serv",
+  "served_by",
   "section_break_ubzfc",
   "kot_items",
   "section_break_zpwun",
@@ -261,12 +263,19 @@
    "fieldtype": "Select",
    "label": "Invoice Type",
    "options": "\nPOS Invoice\nSales Invoice"
+  },
+  {
+   "fieldname": "served_by",
+   "fieldtype": "Link",
+   "label": "Served By",
+   "options": "User",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-22 16:57:32.764400",
+ "modified": "2026-09-23 00:19:14.028014",
  "modified_by": "Administrator",
  "module": "URY",
  "name": "URY KOT",
