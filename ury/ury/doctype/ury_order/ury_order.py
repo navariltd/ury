@@ -334,7 +334,7 @@ def item_query_restaurant(
     as_dict=False,
 ):
     """Return items that are selected in active menu of the restaurant"""
-    restaurant, menu = get_restaurant_and_menu_name(filters["table"])
+    _branch, menu, _restaurant = get_restaurant_and_menu_name(filters["table"])
     items = frappe.db.get_all("URY Menu Item", ["item"], dict(parent=menu, disabled=0))
     del filters["table"]
     filters["name"] = ("in", [d.item for d in items])
@@ -602,7 +602,7 @@ def make_invoice(
     invoice = get_order_invoice(table, invoice, order_type, "Payments")
 
     if table:
-        restaurant = get_restaurant_and_menu_name(table)
+        _branch, _menu, restaurant = get_restaurant_and_menu_name(table)
         invoice.restaurant = restaurant
 
     invoice.customer = customer
