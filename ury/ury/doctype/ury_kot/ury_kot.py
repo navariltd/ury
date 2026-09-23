@@ -297,6 +297,7 @@ def serve_kot(name, time):
 
     kot_doc.start_time_serv = time
     kot_doc.production_time = production_time_minutes
+    kot_doc.served_by = frappe.session.user
     kot_doc.order_status = "Served"
 
     on_kot_update(kot_doc, method=None)
