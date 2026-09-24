@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 
 import frappe
-from erpnext.accounts.doctype.pos_invoice.pos_invoice import get_stock_availability
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import SalesInvoice
 from erpnext.manufacturing.doctype.bom.bom import get_bom_items_as_dict
 from erpnext.manufacturing.doctype.work_order.work_order import make_stock_entry
@@ -9,6 +8,8 @@ from erpnext.stock.utils import get_stock_balance
 from frappe import _
 from frappe.model.meta import get_field_precision
 from frappe.utils import flt, get_datetime, now
+
+from ury.ury.hooks.ury_invoice_stock_mixin import URYInvoiceStockMixin
 
 
 def before_insert(doc, method):
@@ -78,7 +79,7 @@ def remove_tax(doc, method):
 	# doc.run_method("validate")
 
 
-class URYSalesInvoice(SalesInvoice):
+class URYSalesInvoice(URYInvoiceStockMixin, SalesInvoice):
 	def before_insert(self):
 		if self.pos_profile:
 			self.pos_invoice_naming()
@@ -181,41 +182,6 @@ class URYSalesInvoice(SalesInvoice):
 							"available": available_qty,
 						}
 					)
-
-	def validate_finished_item_stock(self, d):
-		"""Validate available stock of a finished QSR item."""
-		available_stock, is_stock_item = get_stock_availability(d.item_code, d.warehouse)
-		if is_stock_item and flt(available_stock) < flt(d.stock_qty):
-			frappe.throw(
-				_(
-					"Row #{}: Insufficient stock for '{}'. Required: {}, Available: {} in warehouse '{}'."
-				).format(d.idx, d.item_name, d.stock_qty, available_stock, d.warehouse),
-				title=_("Insufficient Stock"),
-			)
-
-	def validate_normal_item_stock(self, d):
-		"""Validate normal stock items not part of QSR groups."""
-		available_stock, is_stock_item, is_negative_stock_allowed = get_stock_availability(
-			d.item_code, d.warehouse
-		)
-
-		if is_negative_stock_allowed:
-			return
-
-		if is_stock_item and flt(available_stock) <= 0:
-			frappe.throw(
-				_("Row #{}: Item '{}' is out of stock in warehouse '{}'.").format(
-					d.idx, d.item_name, d.warehouse
-				),
-				title=_("Item Unavailable"),
-			)
-		elif is_stock_item and flt(available_stock) < flt(d.stock_qty):
-			frappe.throw(
-				_(
-					"Row #{}: Insufficient stock for '{}'. Required: {}, Available: {} in warehouse '{}'."
-				).format(d.idx, d.item_name, d.stock_qty, available_stock, d.warehouse),
-				title=_("Insufficient Stock"),
-			)
 
 	def raise_if_missing_materials(self, missing_materials):
 		"""Raise a single combined error message for missing raw materials."""
