@@ -3,12 +3,13 @@
     <img :src="imagePath" alt="URY Mosaic" class="w-40 h-auto shrink-0" />
 
     <div class="ml-auto flex items-center gap-3">
-      <span class="hidden sm:inline text-sm text-gray-500">POS Profile</span>
-      <span class="font-semibold text-gray-800">{{ posProfile || "Loading..." }}</span>
+      <span v-if="!accessDenied" class="hidden sm:inline text-sm text-gray-500">POS Profile</span>
+      <span v-if="!accessDenied" class="font-semibold text-gray-800">{{ posProfile || "Loading..." }}</span>
       <span class="ml-3 hidden sm:inline text-sm text-gray-500">User</span>
       <span class="font-semibold text-gray-800">{{ loggeduser || "Loading..." }}</span>
-      <label class="ml-3 font-semibold text-gray-700" for="production-unit">Production unit</label>
+      <label v-if="!accessDenied" class="ml-3 font-semibold text-gray-700" for="production-unit">Production unit</label>
       <select
+        v-if="!accessDenied"
         id="production-unit"
         v-model="production"
         @change="changeProduction"
@@ -67,8 +68,24 @@
       </div>
     </div>
     <!-- Alert Modal div end-->
+    <div
+      v-if="accessDenied"
+      class="mx-auto mt-24 max-w-xl rounded-xl bg-white p-10 text-center shadow-lg"
+      role="alert"
+    >
+      <div class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-700">
+        <span class="text-2xl font-bold">!</span>
+      </div>
+      <h1 class="text-2xl font-semibold text-gray-900">Access denied</h1>
+      <p class="mt-3 text-gray-600">
+        <span class="font-medium">{{ loggeduser }}</span> is not assigned to
+        <span class="font-medium">{{ deniedPosProfile || "the requested POS Profile" }}</span>.
+      </p>
+      <p class="mt-2 text-gray-500">Contact an administrator to request Kitchen Display System access.</p>
+    </div>
 
     <div
+      v-if="!accessDenied"
       class="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
       <div v-for="kot in this.kot" :key="kot.name">
@@ -310,6 +327,8 @@ export default {
       struckThroughItems: {},
       loggeduser: "",
       showModal: false,
+      accessDenied: false,
+      deniedPosProfile: "",
       kot_alert_time: "",
       showAudioAlertMessage: false,
       audio_alert: 0,
@@ -365,12 +384,39 @@ export default {
             })
             .catch((error) => {
               console.error(error);
+              this.handleKdsError(error);
               reject(error);
             });
         } catch (error) {
           reject(error);
         }
       });
+    },
+    async resolveKdsContext() {
+      const result = await this.call.get(
+        "ury.ury.api.ury_kot_access.get_kds_context",
+        { production_unit: this.production }
+      );
+      const context = result.message || {};
+      this.deniedPosProfile = context.requested_pos_profile || "";
+      if (context.production_unit && context.production_unit !== this.production) {
+        this.production = context.production_unit;
+        window.history.replaceState(
+          {},
+          "",
+          `/URYMosaic/${encodeURIComponent(this.production)}`
+        );
+        this.accessDenied = false;
+        return true;
+      }
+      if (!context.authorized) {
+        this.accessDenied = true;
+        this.kot = [];
+        this.productionUnits = [];
+        return false;
+      }
+      this.accessDenied = false;
+      return true;
     },
     rotateCard(kot) {
       this.masonryLoading();
@@ -392,7 +438,10 @@ export default {
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          this.handleKdsError(error);
+        });
     },
     async serveOrder(kot) {
       const now = new Date();
@@ -412,7 +461,10 @@ export default {
           this.removeAllItemsFromLocalStorage(kot);
           this.fetchKOT();
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          this.handleKdsError(error);
+        });
     },
 
     async orderDelayNotify(kot) {
@@ -429,7 +481,10 @@ export default {
         .then((result) => {
           // console.log("call backed ", result);
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          this.handleKdsError(error);
+        });
     },
     toggleItemStrikeThrough(kotitem, kot) {
       kotitem.striked = !kotitem.striked;
@@ -461,6 +516,32 @@ export default {
     },
     reloadKOT() {
       window.location.reload();
+    },
+    isPermissionError(error) {
+      const details = [
+        error && error.exc_type,
+        error && error.exception,
+        error && error.message,
+        error && error._server_messages,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return (
+        (error && (error.httpStatus === 403 || error.status === 403 || error.statusCode === 403)) ||
+        details.includes("PermissionError") ||
+        details.includes("not permitted to access this Kitchen Display System")
+      );
+    },
+    handleKdsError(error) {
+      if (!this.isPermissionError(error)) return false;
+      this.accessDenied = true;
+      this.deniedPosProfile = this.posProfile || this.deniedPosProfile;
+      this.kot = [];
+      this.productionUnits = [];
+      this.posProfile = "";
+      if (socket && this.kot_channel) socket.off(this.kot_channel);
+      this.kot_channel = "";
+      return true;
     },
 
     updateColorandTable(kot, restaurant_table, type, table_takeaway) {
@@ -633,8 +714,10 @@ export default {
     this.masonryLoading();
 
     this.auth()
-      .then(() => {
-        self.fetchKOT().then(() => {
+      .then(async () => {
+        const canLoad = await self.resolveKdsContext();
+        if (!canLoad) return;
+        await self.fetchKOT().then(() => {
           if (this.audio_alert === 1) {
             this.showAudioAlertMessage = true;
           }
@@ -664,7 +747,7 @@ export default {
       })
       .catch((error) => {
         console.error("Authentication error:", error);
-        this.showModal = true;
+        if (!this.accessDenied) this.showModal = true;
       });
     setInterval(this.updateTimeRemaining, 60000);
   },

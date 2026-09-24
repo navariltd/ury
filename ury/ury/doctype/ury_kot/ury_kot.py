@@ -54,6 +54,16 @@ class URYKOT(Document):
         productions = sorted({
             item.production_unit for item in self.kot_items if item.production_unit
         }) or ([self.production] if self.production else [])
+        authorized_users = set(frappe.get_all(
+            "POS Profile User",
+            filters={
+                "parent": self.pos_profile,
+                "parenttype": "POS Profile",
+                "parentfield": "applicable_for_users",
+            },
+            pluck="user",
+        ))
+        authorized_users.add("Administrator")
         for production in productions:
             production_unit_printers = frappe.get_all(
                 "URY Printer Settings",
@@ -134,10 +144,12 @@ class URYKOT(Document):
             cache_key = "{}_{}_last_kot_time".format(currentBranch, production)
             time = frappe.cache().get_value(cache_key)
             kot_channel = "{}_{}_{}".format("kot_update", currentBranch, production)
-            frappe.publish_realtime(
-                kot_channel,
-                {"kot": kotjson, "audio_file": audio_file, "last_kot_time": time},
-            )
+            for user in authorized_users:
+                frappe.publish_realtime(
+                    kot_channel,
+                    {"kot": kotjson, "audio_file": audio_file, "last_kot_time": time},
+                    user=user,
+                )
             frappe.cache().set_value(cache_key, self.time)
 
     def userSetting(self):
@@ -307,6 +319,9 @@ def delete_or_cancel_wo(wo_name):
 @frappe.whitelist()
 def serve_kot(name, time):
     kot_doc = frappe.get_doc("URY KOT", name)
+    from ury.ury.api.ury_kot_access import assert_kot_access
+
+    assert_kot_access(kot_doc)
 
     current_time = get_datetime()
     production_time = current_time - kot_doc.creation

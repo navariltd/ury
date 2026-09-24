@@ -5,16 +5,15 @@ from frappe import _
 from frappe.utils import flt, get_datetime, now_datetime
 
 from ury.ury.api.ury_kot_generate import _set_header_status, _update_row_status
+from ury.ury.api.ury_kot_access import (
+	assert_kot_access,
+	get_authorized_production_unit,
+)
 from ury.ury.production_routing import get_production_units
 
 
 def _unit_context(production_unit):
-	unit = frappe.db.get_value(
-		"URY Production Unit", production_unit,
-		["name", "pos_profile", "branch"], as_dict=True,
-	)
-	if not unit:
-		frappe.throw(_("Unknown production unit: {0}").format(production_unit))
+	unit = get_authorized_production_unit(production_unit)
 	profile = frappe.db.get_value(
 		"POS Profile", unit.pos_profile,
 		["custom_kot_warning_time", "custom_kot_alert", "custom_reset_order_number_daily"], as_dict=True,
@@ -90,10 +89,14 @@ def serve_kot(name, production_unit, item_rows, time=None):
 	if not item_rows:
 		frappe.throw(_("Select at least one item to serve."))
 	kot = frappe.get_doc("URY KOT", name)
+	unit = get_authorized_production_unit(production_unit)
+	assert_kot_access(kot)
+	if kot.pos_profile != unit.pos_profile:
+		frappe.throw(_("The selected KOT does not belong to this production unit."), frappe.PermissionError)
 	selected = [row for row in kot.kot_items if row.name in item_rows]
 	if len(selected) != len(item_rows):
 		frappe.throw(_("One or more selected KOT items no longer exist."))
-	if any(row.production_unit != production_unit for row in selected):
+	if any((row.production_unit or kot.production) != production_unit for row in selected):
 		frappe.throw(_("Selected items do not belong to production unit {0}.").format(production_unit))
 	served_at = now_datetime()
 	for row in selected:
@@ -119,7 +122,11 @@ def serve_kot(name, production_unit, item_rows, time=None):
 
 @frappe.whitelist()
 def confirm_cancel_kot(name, user):
-	frappe.db.set_value("URY KOT", name, {"verified": 1, "verified_by": user})
+	kot = frappe.get_doc("URY KOT", name)
+	assert_kot_access(kot)
+	frappe.db.set_value(
+		"URY KOT", name, {"verified": 1, "verified_by": frappe.session.user}
+	)
 
 
 @frappe.whitelist(allow_guest=True)
