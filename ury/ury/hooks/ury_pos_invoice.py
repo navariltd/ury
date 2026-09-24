@@ -135,9 +135,13 @@ class URYPOSInvoice(POSInvoice):
 
     def validate_finished_item_stock(self, d):
         """Validate available stock of a finished QSR item."""
-        available_stock, is_stock_item = get_stock_availability(
+        available_stock, is_stock_item, is_negative_stock_allowed = get_stock_availability(
             d.item_code, d.warehouse
         )
+
+        if is_negative_stock_allowed:
+            return
+
         if is_stock_item and flt(available_stock) < flt(d.stock_qty):
             frappe.throw(
                 _(
