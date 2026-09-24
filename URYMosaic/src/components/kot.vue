@@ -91,38 +91,13 @@
       <div v-for="kot in this.kot" :key="kot.name">
         <div
           :class="[kot.color]"
-          class="inline-block shadow-lg gap-4 p-3 rounded-2xl w-90 h-auto masonry-item"
+          class="relative inline-block shadow-lg gap-4 p-3 rounded-2xl w-72 h-auto masonry-item"
           style="margin-top: 28px"
           v-if="!kot.showDiv && kot.production === production"
         >
-          <div class="w-64 check">
-            <div
-              :class="[{ hidden: !kot.isRotated }]"
-              @click="rotateCard(kot)"
-              class="absolute inset-0 bg-white z-50 opacity-80 rounded-2xl flex flex-col justify-center items-center"
-            >
-              <button
-                @click="
-                  kot.type === 'Cancelled' || kot.type === 'Partially cancelled'
-                    ? confirmOrder(kot)
-                    : serveOrder(kot)
-                "
-                :class="[{ hidden: !kot.isRotated }]"
-                class="py-2 px-6 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 ease-in-out"
-              >
-                {{
-                  kot.type === "Cancelled" || kot.type === "Partially cancelled"
-                    ? "Confirm"
-                    : "Serve"
-                }}
-              </button>
-            </div>
-
-            
-              <!-- Serve Button -->
-
+          <div class="w-full check">
               <!-- Card Header: Table Name and Order Number -->
-              <div class="flex justify-between" @click="rotateCard(kot)">
+              <div class="flex justify-between">
                 <div class="text-sm w-48">
                   <span
                     v-if="kot.tableortakeaway !== 'Takeaway'"
@@ -223,7 +198,22 @@
                   </div>
                 </div>
               </div>
-            
+
+              <div class="mt-3 border-t border-gray-200 pt-3">
+                <button
+                  type="button"
+                  @click.stop="isCancellationKot(kot) ? confirmOrder(kot) : serveOrder(kot)"
+                  :disabled="!isCancellationKot(kot) && !hasSelectedItems(kot)"
+                  class="w-full rounded-md bg-blue-600 px-6 py-2 font-medium text-white transition duration-300 ease-in-out hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  :title="
+                    !isCancellationKot(kot) && !hasSelectedItems(kot)
+                      ? 'Select at least one item to serve'
+                      : ''
+                  "
+                >
+                  {{ isCancellationKot(kot) ? "Confirm" : "Serve" }}
+                </button>
+              </div>
           </div>
           <!-- You can add more item/quantity pairs here as needed -->
         </div>
@@ -500,6 +490,12 @@ export default {
         this.clickedItems.add(kotitem.name);
       }
       this.$forceUpdate();
+    },
+    isCancellationKot(kot) {
+      return kot.type === "Cancelled" || kot.type === "Partially cancelled";
+    },
+    hasSelectedItems(kot) {
+      return kot.kot_items.some((item) => this.clickedItems.has(item.name));
     },
     subscribeToProduction() {
       if (!socket || !this.kot_channel) return;
