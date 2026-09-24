@@ -64,6 +64,23 @@ def _publish_kot(kot):
 		kot.kotDisplayRealtime()
 
 
+def _item_state(kot):
+	return sorted(
+		(
+			row.source_invoice_item,
+			row.item,
+			flt(row.active_quantity),
+			flt(row.prepared_quantity),
+			flt(row.cancelled_qty),
+			row.comments or "",
+			row.production_unit,
+			row.preparation_status,
+		)
+		for row in kot.kot_items
+		if row.source_invoice_item
+	)
+
+
 def _sync_kot(invoice, current_items, comments, kot_naming_series):
 	productions = get_production_units(invoice.pos_profile)
 	if not productions:
@@ -103,6 +120,7 @@ def _sync_kot(invoice, current_items, comments, kot_naming_series):
 		"is_aggregator": 1 if invoice.get("order_type") == "Aggregators" else 0,
 		"order_no": invoice.get("custom_ury_order_number"),
 	})
+	previous_item_state = _item_state(kot) if existing_names else None
 
 	branch = frappe.db.get_value("POS Profile", invoice.pos_profile, "branch")
 	menu = _get_menu(invoice, branch)
@@ -143,12 +161,23 @@ def _sync_kot(invoice, current_items, comments, kot_naming_series):
 	if kot.is_new():
 		kot.insert()
 		kot.submit()
-	else:
+	elif kot.docstatus == 0:
+		# A prior submit may have failed after insertion. Retrying the same POS
+		# update must finish the original lifecycle KOT, not turn it into a
+		# modification that remains in Draft.
+		kot.type = "New Order"
+		kot.save(ignore_permissions=True)
+		kot.submit()
+	elif _item_state(kot) != previous_item_state:
+		# POS after-save events can call this endpoint repeatedly with identical
+		# data. Only a material item change is an order modification.
 		kot.type = "Order Modified"
 		kot.flags.ignore_validate_update_after_submit = True
 		kot.save(ignore_permissions=True)
 		_publish_kot(kot)
 		kot.create_or_update_work_orders()
+	else:
+		return kot
 	return kot
 
 
