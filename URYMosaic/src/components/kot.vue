@@ -1,15 +1,33 @@
 <template>
-  <div class="px-6 pt-4 flex justify-end">
-    <label class="mr-2 font-semibold" for="production-unit">Production unit</label>
-    <select
-      id="production-unit"
-      v-model="production"
-      @change="changeProduction"
-      class="bg-white border border-gray-400 rounded px-3 py-2"
+  <header class="bg-white px-6 md:px-12 lg:px-20 py-4 flex items-center gap-6 shadow-sm">
+    <img :src="imagePath" alt="URY Mosaic" class="w-40 h-auto shrink-0" />
+
+    <div class="ml-auto flex items-center gap-3">
+      <span class="hidden sm:inline text-sm text-gray-500">POS Profile</span>
+      <span class="font-semibold text-gray-800">{{ posProfile || "Loading..." }}</span>
+      <label class="ml-3 font-semibold text-gray-700" for="production-unit">Production unit</label>
+      <select
+        id="production-unit"
+        v-model="production"
+        @change="changeProduction"
+        class="bg-white border border-gray-400 rounded px-3 py-2"
+      >
+        <option v-for="unit in productionUnits" :key="unit" :value="unit">{{ unit }}</option>
+      </select>
+    </div>
+
+    <button
+      class="ml-3 hover:bg-slate-200 text-blue-800 p-2 rounded-md"
+      type="button"
+      aria-label="Reload orders"
+      title="Reload orders"
+      @click="reloadKOT"
     >
-      <option v-for="unit in productionUnits" :key="unit" :value="unit">{{ unit }}</option>
-    </select>
-  </div>
+      <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1v5h-5M2 19v-5h5m10-4a8 8 0 0 1-14.947 3.97M1 10a8 8 0 0 1 14.947-3.97" />
+      </svg>
+    </button>
+  </header>
   <div class="mx-auto p-6 mb-16 relative">
     <!-- Alert Modal div start-->
     <div
@@ -226,6 +244,7 @@
 import { FrappeApp } from "frappe-js-sdk";
 import Masonry from "masonry-layout";
 import io from "socket.io-client";
+import uriMosaicImage from "@/assets/logos/mosaic.jpg";
 
 let host = window.location.hostname;
 let port = window.location.port;
@@ -281,6 +300,8 @@ export default {
       call: frappe.call(),
       production: "",
       productionUnits: [],
+      posProfile: "",
+      imagePath: uriMosaicImage,
       branch: "",
       kot_channel: "",
       clickedItems: new Set(),
@@ -331,6 +352,7 @@ export default {
               this.audio_alert = result.message.audio_alert;
               this.daily_order_number = result.message.daily_order_number;
               this.productionUnits = result.message.production_units || [];
+              this.posProfile = result.message.pos_profile || "";
               this.kot_channel = `kot_update_${this.branch}_${this.production}`;
               this.kot = result.message.KOT;
               this.clickedItems.clear();
@@ -434,6 +456,9 @@ export default {
       window.history.replaceState({}, "", `/URYMosaic/${encodeURIComponent(this.production)}`);
       await this.fetchKOT();
       this.subscribeToProduction();
+    },
+    reloadKOT() {
+      window.location.reload();
     },
 
     updateColorandTable(kot, restaurant_table, type, table_takeaway) {
