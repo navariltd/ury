@@ -54,16 +54,6 @@ class URYKOT(Document):
         productions = sorted({
             item.production_unit for item in self.kot_items if item.production_unit
         }) or ([self.production] if self.production else [])
-        authorized_users = set(frappe.get_all(
-            "POS Profile User",
-            filters={
-                "parent": self.pos_profile,
-                "parenttype": "POS Profile",
-                "parentfield": "applicable_for_users",
-            },
-            pluck="user",
-        ))
-        authorized_users.add("Administrator")
         for production in productions:
             production_unit_printers = frappe.get_all(
                 "URY Printer Settings",
@@ -140,6 +130,16 @@ class URYKOT(Document):
         productions = sorted({
             item.production_unit for item in self.kot_items if item.production_unit
         }) or ([self.production] if self.production else [])
+        authorized_users = set(frappe.get_all(
+            "POS Profile User",
+            filters={
+                "parent": self.pos_profile,
+                "parenttype": "POS Profile",
+                "parentfield": "applicable_for_users",
+            },
+            pluck="user",
+        ))
+        authorized_users.add("Administrator")
         for production in productions:
             cache_key = "{}_{}_last_kot_time".format(currentBranch, production)
             time = frappe.cache().get_value(cache_key)

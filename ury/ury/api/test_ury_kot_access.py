@@ -1,3 +1,5 @@
+import ast
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, patch
@@ -60,3 +62,29 @@ class TestURYKOTAccess(TestCase):
 		):
 			ury_kot_access.assert_pos_profile_access("Test POS Profile")
 		db.exists.assert_not_called()
+
+	def test_kot_realtime_resolves_authorized_users_in_method_scope(self):
+		kot_path = (
+			Path(__file__).parents[1]
+			/ "doctype"
+			/ "ury_kot"
+			/ "ury_kot.py"
+		)
+		tree = ast.parse(kot_path.read_text())
+		kot_class = next(
+			node for node in tree.body
+			if isinstance(node, ast.ClassDef) and node.name == "URYKOT"
+		)
+		method = next(
+			node for node in kot_class.body
+			if isinstance(node, ast.FunctionDef) and node.name == "kotDisplayRealtime"
+		)
+		assigned_names = {
+			target.id
+			for node in ast.walk(method)
+			if isinstance(node, ast.Assign)
+			for target in node.targets
+			if isinstance(target, ast.Name)
+		}
+
+		self.assertIn("authorized_users", assigned_names)
