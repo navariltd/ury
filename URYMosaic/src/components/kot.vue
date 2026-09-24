@@ -5,6 +5,8 @@
     <div class="ml-auto flex items-center gap-3">
       <span class="hidden sm:inline text-sm text-gray-500">POS Profile</span>
       <span class="font-semibold text-gray-800">{{ posProfile || "Loading..." }}</span>
+      <span class="ml-3 hidden sm:inline text-sm text-gray-500">User</span>
+      <span class="font-semibold text-gray-800">{{ loggeduser || "Loading..." }}</span>
       <label class="ml-3 font-semibold text-gray-700" for="production-unit">Production unit</label>
       <select
         id="production-unit"
