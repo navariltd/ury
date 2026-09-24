@@ -448,19 +448,9 @@ class URYSalesInvoice(URYInvoiceStockMixin, SalesInvoice):
 
 	@staticmethod
 	def get_qsr_item_groups(pos_profile):
-		"""
-		Get all item groups linked to the URY Production Unit assigned to this POS Profile.
-		"""
-		production_unit = frappe.db.get_value("URY Production Unit", {"pos_profile": pos_profile}, "name")
+		from ury.ury.production_routing import get_qsr_item_groups
 
-		if not production_unit:
-			return []
-
-		return frappe.get_all(
-			"URY Production Item Groups",
-			filters={"parent": production_unit},
-			pluck="item_group",
-		)
+		return get_qsr_item_groups(pos_profile)
 
 	def auto_complete_work_orders(self):
 		"""
@@ -599,5 +589,11 @@ def _mark_kot_served(kot_name):
 	kot_doc.start_time_serv = now()
 	kot_doc.production_time = production_time_minutes
 	kot_doc.order_status = "Served"
-
+	for row in kot_doc.kot_items:
+		if row.production_unit and row.active_quantity:
+			row.prepared_quantity = row.active_quantity
+			row.preparation_status = "Served"
+			row.served_at = now()
+			row.served_by = frappe.session.user
+	kot_doc.flags.ignore_validate_update_after_submit = True
 	kot_doc.save(ignore_permissions=True)

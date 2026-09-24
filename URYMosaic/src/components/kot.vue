@@ -1,4 +1,15 @@
 <template>
+  <div class="px-6 pt-4 flex justify-end">
+    <label class="mr-2 font-semibold" for="production-unit">Production unit</label>
+    <select
+      id="production-unit"
+      v-model="production"
+      @change="changeProduction"
+      class="bg-white border border-gray-400 rounded px-3 py-2"
+    >
+      <option v-for="unit in productionUnits" :key="unit" :value="unit">{{ unit }}</option>
+    </select>
+  </div>
   <div class="mx-auto p-6 mb-16 relative">
     <!-- Alert Modal div start-->
     <div
@@ -136,15 +147,16 @@
                   <div
                     @click="
                       () => {
-                        toggleItemStrikeThrough(kotitem, kot);
+                        toggleItemSelection(kotitem);
                       }
                     "
                     :class="{
-                      'line-through text-green-700': kotitem.striked,
+                      'text-green-700 bg-green-100': clickedItems.has(kotitem.name),
                     }"
-                    class="flex font-semibold justify-between items-center"
+                    class="flex font-semibold justify-between items-center cursor-pointer rounded px-1"
                   >
                     <div>
+                      <input type="checkbox" class="mr-1" :checked="clickedItems.has(kotitem.name)" />
                       <span class="ml-2 text-black-100">{{
                         kotitem.item_name
                       }}<span v-show="kotitem.indicate_course" class="text-sm text-gray-500 ml-1"> ( {{kotitem.course}} )</span>
@@ -268,6 +280,7 @@ export default {
       masonry: null,
       call: frappe.call(),
       production: "",
+      productionUnits: [],
       branch: "",
       kot_channel: "",
       clickedItems: new Set(),
@@ -308,15 +321,19 @@ export default {
       return new Promise((resolve, reject) => {
         try {
           this.call
-            .get("ury.ury.api.ury_kot_display.kot_list", {})
+            .get("ury.ury.api.ury_kot_display.kot_list", {
+              production_unit: this.production,
+            })
             .then((result) => {
               console.log(result,"..............result")
               this.branch = result.message.Branch;
               this.kot_alert_time = result.message.kot_alert_time;
               this.audio_alert = result.message.audio_alert;
               this.daily_order_number = result.message.daily_order_number;
+              this.productionUnits = result.message.production_units || [];
               this.kot_channel = `kot_update_${this.branch}_${this.production}`;
               this.kot = result.message.KOT;
+              this.clickedItems.clear();
               this.updateQtyColorTable();
               this.updateTimeRemaining();
               this.masonryLoading();
@@ -361,14 +378,15 @@ export default {
         .post("ury.ury.api.ury_kot_display.serve_kot", {
           name: kot.name,
           time: this.currentTime,
+          production_unit: this.production,
+          item_rows: Array.from(this.clickedItems).filter((name) =>
+            kot.kot_items.some((item) => item.name === name)
+          ),
         })
         .then((result) => {
           // kot.isHidden = !kot.isHidden;
-          kot.showDiv = !kot.showDiv;
-          // this.showDiv = false;
-
           this.removeAllItemsFromLocalStorage(kot);
-          this.masonryLoading();
+          this.fetchKOT();
         })
         .catch((error) => console.error(error));
     },
@@ -395,6 +413,27 @@ export default {
         `${kot.name}_${kotitem.name}_strike`,
         JSON.stringify(kotitem.striked)
       );
+    },
+    toggleItemSelection(kotitem) {
+      if (this.clickedItems.has(kotitem.name)) {
+        this.clickedItems.delete(kotitem.name);
+      } else {
+        this.clickedItems.add(kotitem.name);
+      }
+      this.$forceUpdate();
+    },
+    subscribeToProduction() {
+      if (!socket || !this.kot_channel) return;
+      socket.off(this.kot_channel);
+      socket.on(this.kot_channel, () => {
+        this.fetchKOT();
+      });
+    },
+    async changeProduction() {
+      if (socket && this.kot_channel) socket.off(this.kot_channel);
+      window.history.replaceState({}, "", `/URYMosaic/${encodeURIComponent(this.production)}`);
+      await this.fetchKOT();
+      this.subscribeToProduction();
     },
 
     updateColorandTable(kot, restaurant_table, type, table_takeaway) {
@@ -584,10 +623,7 @@ export default {
                 });
               }
             }
-            this.kot.unshift(doc.kot);
-            this.masonryLoading();
-            this.updateQtyColorTable();
-            this.updateTimeRemaining();
+            this.fetchKOT();
             setTimeout(()=>{
               if (doc.kot.type === "Cancelled"){
                 this.fetchKOT().then(() => {

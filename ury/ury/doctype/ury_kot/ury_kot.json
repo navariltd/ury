@@ -109,9 +109,10 @@
    "allow_on_submit": 1,
    "default": "Ready For Prepare",
    "fieldname": "order_status",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Order Status",
+   "options": "Ready For Prepare\nPartially Prepared\nServed\nCancelled",
    "read_only": 1
   },
   {
