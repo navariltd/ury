@@ -12,6 +12,13 @@
   "item_name",
   "quantity",
   "cancelled_qty",
+  "active_quantity",
+  "prepared_quantity",
+  "preparation_status",
+  "production_unit",
+  "source_invoice_item",
+  "served_at",
+  "served_by",
   "comments",
   "course",
   "serve_priority",
@@ -19,6 +26,7 @@
  ],
  "fields": [
   {
+   "allow_on_submit": 1,
    "fieldname": "item",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -26,6 +34,7 @@
    "options": "Item"
   },
   {
+   "allow_on_submit": 1,
    "fetch_from": "item.item_name",
    "fieldname": "item_name",
    "fieldtype": "Data",
@@ -33,12 +42,14 @@
    "label": "Item Name"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "quantity",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Quantity"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "cancelled_qty",
    "fieldtype": "Data",
    "in_preview": 1,
@@ -46,11 +57,68 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "active_quantity",
+   "fieldtype": "Float",
+   "label": "Active Quantity",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "prepared_quantity",
+   "fieldtype": "Float",
+   "label": "Prepared Quantity",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Ready For Prepare",
+   "fieldname": "preparation_status",
+   "fieldtype": "Select",
+   "label": "Preparation Status",
+   "options": "Ready For Prepare\nServed\nCancelled",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "production_unit",
+   "fieldtype": "Link",
+   "label": "Production Unit",
+   "options": "URY Production Unit",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "source_invoice_item",
+   "fieldtype": "Data",
+   "label": "Source Invoice Item",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "served_at",
+   "fieldtype": "Datetime",
+   "label": "Served At",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "served_by",
+   "fieldtype": "Link",
+   "label": "Served By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
    "fieldname": "comments",
    "fieldtype": "Data",
    "label": "Comments"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "course",
    "fieldtype": "Link",
    "label": "Course",

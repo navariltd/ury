@@ -1,5 +1,7 @@
 import frappe
 
+from ury.ury.api.ury_kot_access import assert_kot_access
+
 
 def get_users_with_role(role_name):
     users_with_role = frappe.get_all(
@@ -18,15 +20,17 @@ def get_users_with_role(role_name):
 
 @frappe.whitelist()
 def order_delay_notification(id):
-    table = frappe.db.get_value("URY KOT", id, "restaurant_table")
+    kot = frappe.get_doc("URY KOT", id)
+    assert_kot_access(kot)
+    table = kot.restaurant_table
     tableOrTakeaway = "Take Away"
     if table:
         tableOrTakeaway = table
-    order_status = frappe.db.get_value("URY KOT", id, "order_status")
-    invoice_id = frappe.db.get_value("URY KOT", id, "invoice")
+    order_status = kot.order_status
+    invoice_id = kot.invoice
     order_id = invoice_id[-5:]
-    kot_type = frappe.db.get_value("URY KOT", id, "type")
-    pos_profile = frappe.db.get_value("URY KOT", id, "pos_profile")
+    kot_type = kot.type
+    pos_profile = kot.pos_profile
     items = frappe.get_all(
         "URY KOT Items",
         fields=["item_name", "quantity"],

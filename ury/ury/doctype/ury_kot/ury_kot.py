@@ -23,10 +23,19 @@ class URYKOT(Document):
     # Function for printing multiple KOTs.
     def multi_print_kot(self):
         # Function for printing a KOT on a specified printer using a print format.
-        def print_kot(printer, kot_print_format):
+        def print_kot(printer, kot_print_format, production=None):
             try:
+                print_doc = self
+                if production:
+                    print_doc = frappe.get_doc(self.as_dict())
+                    print_doc.set(
+                        "kot_items",
+                        [row.as_dict() for row in self.kot_items if row.production_unit == production],
+                    )
                 # Print KOT using a server function (print_by_server)
-                print_by_server("URY KOT", self.name, printer, kot_print_format)
+                print_by_server(
+                    "URY KOT", self.name, printer, kot_print_format, doc=print_doc
+                )
             except Exception:
                 pass
 
@@ -42,7 +51,10 @@ class URYKOT(Document):
         )
 
         pos_print_flag = True
-        if self.production:
+        productions = sorted({
+            item.production_unit for item in self.kot_items if item.production_unit
+        }) or ([self.production] if self.production else [])
+        for production in productions:
             production_unit_printers = frappe.get_all(
                 "URY Printer Settings",
                 fields=[
@@ -52,7 +64,7 @@ class URYKOT(Document):
                     "block_takeaway_kot",
                 ],
                 filters={
-                    "parent": self.production,
+                    "parent": production,
                     "kot_print": 1,
                     "parenttype": "URY Production Unit",
                 },
@@ -65,9 +77,9 @@ class URYKOT(Document):
                     pos_print_flag = False
                     if printer.block_takeaway_kot == 1:
                         if self.restaurant_table and self.table_takeaway == 0:
-                            print_kot(printer.printer, printer.kot_print_format)
+                            print_kot(printer.printer, printer.kot_print_format, production)
                     else:
-                        print_kot(printer.printer, printer.kot_print_format)
+                        print_kot(printer.printer, printer.kot_print_format, production)
 
                 # Check if restaurant table is specified and it's not a takeaway order
                 if self.restaurant_table and self.table_takeaway == 0:
@@ -94,7 +106,7 @@ class URYKOT(Document):
                     if room_kot_printers:
                         for printer in room_kot_printers:
                             pos_print_flag = False
-                            print_kot(printer.printer, printer.kot_print_format)
+                            print_kot(printer.printer, printer.kot_print_format, production)
 
                     if pos_print_flag:
                         if pos_kot_printers:
@@ -111,19 +123,34 @@ class URYKOT(Document):
     # Function for displaying KOT-related information in real-time On KDS(Kitchen Display System)
     def kotDisplayRealtime(self):
         currentBranch = self.branch
-        production = self.production
         kotjson = json.loads(frappe.as_json(self))
         audio_file = frappe.db.get_value(
             "POS Profile", self.pos_profile, "custom_kot_alert_sound"
         )
-        cache_key = "{}_{}_last_kot_time".format(currentBranch, production)
-        time = frappe.cache().get_value(cache_key)
-        kot_channel = "{}_{}_{}".format("kot_update", currentBranch, production)
-        frappe.publish_realtime(
-            kot_channel,
-            {"kot": kotjson, "audio_file": audio_file, "last_kot_time": time},
-        )
-        frappe.cache().set_value(cache_key, self.time)
+        productions = sorted({
+            item.production_unit for item in self.kot_items if item.production_unit
+        }) or ([self.production] if self.production else [])
+        authorized_users = set(frappe.get_all(
+            "POS Profile User",
+            filters={
+                "parent": self.pos_profile,
+                "parenttype": "POS Profile",
+                "parentfield": "applicable_for_users",
+            },
+            pluck="user",
+        ))
+        authorized_users.add("Administrator")
+        for production in productions:
+            cache_key = "{}_{}_last_kot_time".format(currentBranch, production)
+            time = frappe.cache().get_value(cache_key)
+            kot_channel = "{}_{}_{}".format("kot_update", currentBranch, production)
+            for user in authorized_users:
+                frappe.publish_realtime(
+                    kot_channel,
+                    {"kot": kotjson, "audio_file": audio_file, "last_kot_time": time},
+                    user=user,
+                )
+            frappe.cache().set_value(cache_key, self.time)
 
     def userSetting(self):
         userDoc = frappe.get_doc("User", self.owner)
@@ -131,11 +158,8 @@ class URYKOT(Document):
 
     def get_auto_manufacture_setting(self):
         """Fetch Auto Manufacture on Sale flag from POS Profile"""
-        pos_profile = frappe.db.get_value(
-            "URY Production Unit", self.production, "pos_profile"
-        )
         return frappe.db.get_value(
-            "POS Profile", pos_profile, "auto_manufacture_on_sale"
+            "POS Profile", self.pos_profile, "auto_manufacture_on_sale"
         )
 
     def create_or_update_work_orders(self):
@@ -191,6 +215,11 @@ def calculate_item_totals(all_kots):
 
     for kot in all_kots:
         kot_doc = frappe.get_doc("URY KOT", kot.name)
+
+        if any(item.production_unit for item in kot_doc.kot_items):
+            for item in kot_doc.kot_items:
+                item_totals[item.item] = item_totals.get(item.item, 0.0) + flt(item.active_quantity)
+            continue
 
         is_cancellation = kot_doc.type in ["Cancelled", "Partially cancelled"]
 
@@ -290,6 +319,9 @@ def delete_or_cancel_wo(wo_name):
 @frappe.whitelist()
 def serve_kot(name, time):
     kot_doc = frappe.get_doc("URY KOT", name)
+    from ury.ury.api.ury_kot_access import assert_kot_access
+
+    assert_kot_access(kot_doc)
 
     current_time = get_datetime()
     production_time = current_time - kot_doc.creation

@@ -1,4 +1,36 @@
 <template>
+  <header class="bg-white px-6 md:px-12 lg:px-20 py-4 flex items-center gap-6 shadow-sm">
+    <img :src="imagePath" alt="URY Mosaic" class="w-40 h-auto shrink-0" />
+
+    <div class="ml-auto flex items-center gap-3">
+      <span v-if="!accessDenied" class="hidden sm:inline text-sm text-gray-500">POS Profile</span>
+      <span v-if="!accessDenied" class="font-semibold text-gray-800">{{ posProfile || "Loading..." }}</span>
+      <span class="ml-3 hidden sm:inline text-sm text-gray-500">User</span>
+      <span class="font-semibold text-gray-800">{{ loggeduser || "Loading..." }}</span>
+      <label v-if="!accessDenied" class="ml-3 font-semibold text-gray-700" for="production-unit">Production unit</label>
+      <select
+        v-if="!accessDenied"
+        id="production-unit"
+        v-model="production"
+        @change="changeProduction"
+        class="bg-white border border-gray-400 rounded px-3 py-2"
+      >
+        <option v-for="unit in productionUnits" :key="unit" :value="unit">{{ unit }}</option>
+      </select>
+    </div>
+
+    <button
+      class="ml-3 hover:bg-slate-200 text-blue-800 p-2 rounded-md"
+      type="button"
+      aria-label="Reload orders"
+      title="Reload orders"
+      @click="reloadKOT"
+    >
+      <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 20">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 1v5h-5M2 19v-5h5m10-4a8 8 0 0 1-14.947 3.97M1 10a8 8 0 0 1 14.947-3.97" />
+      </svg>
+    </button>
+  </header>
   <div class="mx-auto p-6 mb-16 relative">
     <!-- Alert Modal div start-->
     <div
@@ -36,45 +68,36 @@
       </div>
     </div>
     <!-- Alert Modal div end-->
+    <div
+      v-if="accessDenied"
+      class="mx-auto mt-24 max-w-xl rounded-xl bg-white p-10 text-center shadow-lg"
+      role="alert"
+    >
+      <div class="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-700">
+        <span class="text-2xl font-bold">!</span>
+      </div>
+      <h1 class="text-2xl font-semibold text-gray-900">Access denied</h1>
+      <p class="mt-3 text-gray-600">
+        <span class="font-medium">{{ loggeduser }}</span> is not assigned to
+        <span class="font-medium">{{ deniedPosProfile || "the requested POS Profile" }}</span>.
+      </p>
+      <p class="mt-2 text-gray-500">Contact an administrator to request Kitchen Display System access.</p>
+    </div>
 
     <div
+      v-if="!accessDenied"
       class="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
     >
       <div v-for="kot in this.kot" :key="kot.name">
         <div
           :class="[kot.color]"
-          class="inline-block shadow-lg gap-4 p-3 rounded-2xl w-90 h-auto masonry-item"
+          class="relative inline-block shadow-lg gap-4 p-3 rounded-2xl w-72 h-auto masonry-item"
           style="margin-top: 28px"
           v-if="!kot.showDiv && kot.production === production"
         >
-          <div class="w-64 check">
-            <div
-              :class="[{ hidden: !kot.isRotated }]"
-              @click="rotateCard(kot)"
-              class="absolute inset-0 bg-white z-50 opacity-80 rounded-2xl flex flex-col justify-center items-center"
-            >
-              <button
-                @click="
-                  kot.type === 'Cancelled' || kot.type === 'Partially cancelled'
-                    ? confirmOrder(kot)
-                    : serveOrder(kot)
-                "
-                :class="[{ hidden: !kot.isRotated }]"
-                class="py-2 px-6 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 ease-in-out"
-              >
-                {{
-                  kot.type === "Cancelled" || kot.type === "Partially cancelled"
-                    ? "Confirm"
-                    : "Serve"
-                }}
-              </button>
-            </div>
-
-            
-              <!-- Serve Button -->
-
+          <div class="w-full check">
               <!-- Card Header: Table Name and Order Number -->
-              <div class="flex justify-between" @click="rotateCard(kot)">
+              <div class="flex justify-between">
                 <div class="text-sm w-48">
                   <span
                     v-if="kot.tableortakeaway !== 'Takeaway'"
@@ -136,15 +159,16 @@
                   <div
                     @click="
                       () => {
-                        toggleItemStrikeThrough(kotitem, kot);
+                        toggleItemSelection(kotitem);
                       }
                     "
                     :class="{
-                      'line-through text-green-700': kotitem.striked,
+                      'text-green-700 bg-green-100': clickedItems.has(kotitem.name),
                     }"
-                    class="flex font-semibold justify-between items-center"
+                    class="flex font-semibold justify-between items-center cursor-pointer rounded px-1"
                   >
                     <div>
+                      <input type="checkbox" class="mr-1" :checked="clickedItems.has(kotitem.name)" />
                       <span class="ml-2 text-black-100">{{
                         kotitem.item_name
                       }}<span v-show="kotitem.indicate_course" class="text-sm text-gray-500 ml-1"> ( {{kotitem.course}} )</span>
@@ -174,7 +198,22 @@
                   </div>
                 </div>
               </div>
-            
+
+              <div class="mt-3 border-t border-gray-200 pt-3">
+                <button
+                  type="button"
+                  @click.stop="isCancellationKot(kot) ? confirmOrder(kot) : serveOrder(kot)"
+                  :disabled="!isCancellationKot(kot) && !hasSelectedItems(kot)"
+                  class="w-full rounded-md bg-blue-600 px-6 py-2 font-medium text-white transition duration-300 ease-in-out hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  :title="
+                    !isCancellationKot(kot) && !hasSelectedItems(kot)
+                      ? 'Select at least one item to serve'
+                      : ''
+                  "
+                >
+                  {{ isCancellationKot(kot) ? "Confirm" : "Serve" }}
+                </button>
+              </div>
           </div>
           <!-- You can add more item/quantity pairs here as needed -->
         </div>
@@ -214,6 +253,7 @@
 import { FrappeApp } from "frappe-js-sdk";
 import Masonry from "masonry-layout";
 import io from "socket.io-client";
+import uriMosaicImage from "@/assets/logos/mosaic.jpg";
 
 let host = window.location.hostname;
 let port = window.location.port;
@@ -268,12 +308,18 @@ export default {
       masonry: null,
       call: frappe.call(),
       production: "",
+      productionUnits: [],
+      posProfile: "",
+      imagePath: uriMosaicImage,
       branch: "",
       kot_channel: "",
       clickedItems: new Set(),
       struckThroughItems: {},
+      sessionUser: "",
       loggeduser: "",
       showModal: false,
+      accessDenied: false,
+      deniedPosProfile: "",
       kot_alert_time: "",
       showAudioAlertMessage: false,
       audio_alert: 0,
@@ -295,6 +341,7 @@ export default {
         auth
           .getLoggedInUser()
           .then((user) => {
+            this.sessionUser = user;
             this.loggeduser = user;
             resolve();
           })
@@ -308,15 +355,20 @@ export default {
       return new Promise((resolve, reject) => {
         try {
           this.call
-            .get("ury.ury.api.ury_kot_display.kot_list", {})
+            .get("ury.ury.api.ury_kot_display.kot_list", {
+              production_unit: this.production,
+            })
             .then((result) => {
               console.log(result,"..............result")
               this.branch = result.message.Branch;
               this.kot_alert_time = result.message.kot_alert_time;
               this.audio_alert = result.message.audio_alert;
               this.daily_order_number = result.message.daily_order_number;
+              this.productionUnits = result.message.production_units || [];
+              this.posProfile = result.message.pos_profile || "";
               this.kot_channel = `kot_update_${this.branch}_${this.production}`;
               this.kot = result.message.KOT;
+              this.clickedItems.clear();
               this.updateQtyColorTable();
               this.updateTimeRemaining();
               this.masonryLoading();
@@ -324,12 +376,40 @@ export default {
             })
             .catch((error) => {
               console.error(error);
+              this.handleKdsError(error);
               reject(error);
             });
         } catch (error) {
           reject(error);
         }
       });
+    },
+    async resolveKdsContext() {
+      const result = await this.call.get(
+        "ury.ury.api.ury_kot_access.get_kds_context",
+        { production_unit: this.production }
+      );
+      const context = result.message || {};
+      this.loggeduser = context.user_full_name || this.sessionUser;
+      this.deniedPosProfile = context.requested_pos_profile || "";
+      if (context.production_unit && context.production_unit !== this.production) {
+        this.production = context.production_unit;
+        window.history.replaceState(
+          {},
+          "",
+          `/URYMosaic/${encodeURIComponent(this.production)}`
+        );
+        this.accessDenied = false;
+        return true;
+      }
+      if (!context.authorized) {
+        this.accessDenied = true;
+        this.kot = [];
+        this.productionUnits = [];
+        return false;
+      }
+      this.accessDenied = false;
+      return true;
     },
     rotateCard(kot) {
       this.masonryLoading();
@@ -341,7 +421,7 @@ export default {
       this.call
         .post("ury.ury.api.ury_kot_display.confirm_cancel_kot", {
           name: kot.name,
-          user: this.loggeduser,
+          user: this.sessionUser,
         })
         .then((result) => {
           // kot.isHidden = !kot.isHidden;
@@ -351,7 +431,10 @@ export default {
           this.removeAllItemsFromLocalStorage(kot);
           this.masonryLoading();
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          this.handleKdsError(error);
+        });
     },
     async serveOrder(kot) {
       const now = new Date();
@@ -361,16 +444,20 @@ export default {
         .post("ury.ury.api.ury_kot_display.serve_kot", {
           name: kot.name,
           time: this.currentTime,
+          production_unit: this.production,
+          item_rows: Array.from(this.clickedItems).filter((name) =>
+            kot.kot_items.some((item) => item.name === name)
+          ),
         })
         .then((result) => {
           // kot.isHidden = !kot.isHidden;
-          kot.showDiv = !kot.showDiv;
-          // this.showDiv = false;
-
           this.removeAllItemsFromLocalStorage(kot);
-          this.masonryLoading();
+          this.fetchKOT();
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          this.handleKdsError(error);
+        });
     },
 
     async orderDelayNotify(kot) {
@@ -387,7 +474,10 @@ export default {
         .then((result) => {
           // console.log("call backed ", result);
         })
-        .catch((error) => console.error(error));
+        .catch((error) => {
+          console.error(error);
+          this.handleKdsError(error);
+        });
     },
     toggleItemStrikeThrough(kotitem, kot) {
       kotitem.striked = !kotitem.striked;
@@ -395,6 +485,62 @@ export default {
         `${kot.name}_${kotitem.name}_strike`,
         JSON.stringify(kotitem.striked)
       );
+    },
+    toggleItemSelection(kotitem) {
+      if (this.clickedItems.has(kotitem.name)) {
+        this.clickedItems.delete(kotitem.name);
+      } else {
+        this.clickedItems.add(kotitem.name);
+      }
+      this.$forceUpdate();
+    },
+    isCancellationKot(kot) {
+      return kot.type === "Cancelled" || kot.type === "Partially cancelled";
+    },
+    hasSelectedItems(kot) {
+      return kot.kot_items.some((item) => this.clickedItems.has(item.name));
+    },
+    subscribeToProduction() {
+      if (!socket || !this.kot_channel) return;
+      socket.off(this.kot_channel);
+      socket.on(this.kot_channel, () => {
+        this.fetchKOT();
+      });
+    },
+    async changeProduction() {
+      if (socket && this.kot_channel) socket.off(this.kot_channel);
+      window.history.replaceState({}, "", `/URYMosaic/${encodeURIComponent(this.production)}`);
+      await this.fetchKOT();
+      this.subscribeToProduction();
+    },
+    reloadKOT() {
+      window.location.reload();
+    },
+    isPermissionError(error) {
+      const details = [
+        error && error.exc_type,
+        error && error.exception,
+        error && error.message,
+        error && error._server_messages,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return (
+        (error && (error.httpStatus === 403 || error.status === 403 || error.statusCode === 403)) ||
+        details.includes("PermissionError") ||
+        details.includes("not permitted to access this Kitchen Display System")
+      );
+    },
+    handleKdsError(error) {
+      if (!this.isPermissionError(error)) return false;
+      this.accessDenied = true;
+      this.deniedPosProfile = this.posProfile || this.deniedPosProfile;
+      this.kot = [];
+      this.productionUnits = [];
+      this.posProfile = "";
+      if (socket && this.kot_channel) socket.off(this.kot_channel);
+      this.kot_channel = "";
+      return true;
     },
 
     updateColorandTable(kot, restaurant_table, type, table_takeaway) {
@@ -567,8 +713,10 @@ export default {
     this.masonryLoading();
 
     this.auth()
-      .then(() => {
-        self.fetchKOT().then(() => {
+      .then(async () => {
+        const canLoad = await self.resolveKdsContext();
+        if (!canLoad) return;
+        await self.fetchKOT().then(() => {
           if (this.audio_alert === 1) {
             this.showAudioAlertMessage = true;
           }
@@ -584,10 +732,7 @@ export default {
                 });
               }
             }
-            this.kot.unshift(doc.kot);
-            this.masonryLoading();
-            this.updateQtyColorTable();
-            this.updateTimeRemaining();
+            this.fetchKOT();
             setTimeout(()=>{
               if (doc.kot.type === "Cancelled"){
                 this.fetchKOT().then(() => {
@@ -601,7 +746,7 @@ export default {
       })
       .catch((error) => {
         console.error("Authentication error:", error);
-        this.showModal = true;
+        if (!this.accessDenied) this.showModal = true;
       });
     setInterval(this.updateTimeRemaining, 60000);
   },

@@ -220,21 +220,9 @@ def invalidate_item_stock_cache(doc, method=None):
 
 
 def get_qsr_item_groups(pos_profile):
-	"""
-	Get all item groups linked to the URY Production Unit assigned to this POS Profile.
-	"""
-	production_unit = frappe.db.get_value(
-		"URY Production Unit", {"pos_profile": pos_profile}, "name"
-	)
+	from ury.ury.production_routing import get_qsr_item_groups as _get_qsr_item_groups
 
-	if not production_unit:
-		return []
-
-	return frappe.get_all(
-		"URY Production Item Groups",
-		filters={"parent": production_unit},
-		pluck="item_group",
-	)
+	return _get_qsr_item_groups(pos_profile)
 
 
 @frappe.whitelist()
