@@ -53,6 +53,13 @@ def _first_production_unit(pos_profiles):
 	return None
 
 
+def _session_full_name():
+	return (
+		frappe.db.get_value("User", frappe.session.user, "full_name")
+		or frappe.session.user
+	)
+
+
 @frappe.whitelist()
 def get_kds_context(production_unit=None):
 	"""Resolve the requested display or a deterministic display assigned to the user."""
@@ -75,6 +82,7 @@ def get_kds_context(production_unit=None):
 			"authorized": bool(selected),
 			"production_unit": selected,
 			"requested_pos_profile": requested.pos_profile if requested else None,
+			"user_full_name": _session_full_name(),
 		}
 
 	assignments = frappe.get_all(
@@ -93,6 +101,7 @@ def get_kds_context(production_unit=None):
 			"authorized": True,
 			"production_unit": requested.name,
 			"requested_pos_profile": requested.pos_profile,
+			"user_full_name": _session_full_name(),
 		}
 
 	fallback = _first_production_unit(assigned_profiles)
@@ -100,4 +109,5 @@ def get_kds_context(production_unit=None):
 		"authorized": False,
 		"production_unit": fallback,
 		"requested_pos_profile": requested.pos_profile if requested else None,
+		"user_full_name": _session_full_name(),
 	}

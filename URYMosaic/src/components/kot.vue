@@ -315,6 +315,7 @@ export default {
       kot_channel: "",
       clickedItems: new Set(),
       struckThroughItems: {},
+      sessionUser: "",
       loggeduser: "",
       showModal: false,
       accessDenied: false,
@@ -340,6 +341,7 @@ export default {
         auth
           .getLoggedInUser()
           .then((user) => {
+            this.sessionUser = user;
             this.loggeduser = user;
             resolve();
           })
@@ -388,6 +390,7 @@ export default {
         { production_unit: this.production }
       );
       const context = result.message || {};
+      this.loggeduser = context.user_full_name || this.sessionUser;
       this.deniedPosProfile = context.requested_pos_profile || "";
       if (context.production_unit && context.production_unit !== this.production) {
         this.production = context.production_unit;
@@ -418,7 +421,7 @@ export default {
       this.call
         .post("ury.ury.api.ury_kot_display.confirm_cancel_kot", {
           name: kot.name,
-          user: this.loggeduser,
+          user: this.sessionUser,
         })
         .then((result) => {
           // kot.isHidden = !kot.isHidden;
