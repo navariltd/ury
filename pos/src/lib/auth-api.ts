@@ -27,7 +27,6 @@ export const getUserRoles = async (email: string): Promise<{ roles: string[]; fu
       throw new Error(`Session user mismatch: expected ${email}, received ${userInfo.name}`);
     }
 
-    console.debug('[URY POS] Current user info', userInfo);
     return {
       roles: userInfo.roles,
       full_name: userInfo.full_name,
