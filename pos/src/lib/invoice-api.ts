@@ -3,6 +3,7 @@ import { OrderType } from '../data/order-types';
 
 export interface POSInvoice {
   name: string;
+  doctype: string;
   invoice_printed: number;
   grand_total: number;
   restaurant_table: string | null;
