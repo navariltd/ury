@@ -434,7 +434,7 @@ def getPosInvoice(status, limit, limit_start):
 		invoices = frappe.db.sql(
 			f"""
 			SELECT
-				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.name, '{invoice_type}' as doctype, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
 				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
 				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
 				pi.posting_date, pi.rounded_total, pi.order_type
@@ -454,7 +454,7 @@ def getPosInvoice(status, limit, limit_start):
 		invoices = frappe.db.sql(
 			f"""
 			SELECT
-				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.name, '{invoice_type}' as doctype, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
 				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
 				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
 				pi.posting_date, pi.rounded_total, pi.order_type
@@ -474,7 +474,7 @@ def getPosInvoice(status, limit, limit_start):
 		invoices = frappe.db.sql(
 			f"""
 			SELECT
-				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.name, '{invoice_type}' as doctype, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
 				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
 				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
 				pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
@@ -492,7 +492,7 @@ def getPosInvoice(status, limit, limit_start):
 		invoices = frappe.db.sql(
 			f"""
 			SELECT
-				pi.name, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
+				pi.name, '{invoice_type}' as doctype, pi.invoice_printed, pi.grand_total, pi.restaurant_table,
 				pi.cashier, u.full_name as cashier_name, pi.waiter, pi.net_total, pi.posting_time,
 				pi.total_taxes_and_charges, pi.customer, pi.status, pi.mobile_number,
 				pi.posting_date, pi.rounded_total, pi.order_type, pi.additional_discount_percentage, pi.discount_amount
@@ -539,7 +539,7 @@ def searchPosInvoice(query, status):
 	pos_invoices = frappe.db.sql(
 		f"""
 		SELECT
-			pi.name, pi.customer, pi.grand_total, pi.posting_date, pi.posting_time,
+			pi.name, '{invoice_type}' as doctype, pi.customer, pi.grand_total, pi.posting_date, pi.posting_time,
 			pi.order_type, pi.restaurant_table, pi.status, pi.rounded_total,
 			pi.net_total, pi.mobile_number, pi.cashier, u.full_name as cashier_name
 		FROM {table_name} pi
